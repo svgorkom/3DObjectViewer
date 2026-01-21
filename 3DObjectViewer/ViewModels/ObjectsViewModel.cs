@@ -298,8 +298,8 @@ public class ObjectsViewModel : ViewModelBase
     /// </summary>
     private Point3D GetDropPosition(double objectHeight)
     {
-        // Spread objects more when dropping multiple
-        double spreadFactor = DropCount > 1 ? 8 : 6;
+        // Spread objects more when dropping multiple (extended by factor 4)
+        double spreadFactor = DropCount > 1 ? 32 : 24;
         double halfSpread = spreadFactor / 2;
         
         return new Point3D(
