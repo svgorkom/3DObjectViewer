@@ -26,6 +26,36 @@ public enum ObjectColor
     Yellow,
 
     /// <summary>
+    /// Orange color (RGB: 255, 165, 0).
+    /// </summary>
+    Orange,
+
+    /// <summary>
+    /// Purple color (RGB: 128, 0, 128).
+    /// </summary>
+    Purple,
+
+    /// <summary>
+    /// Cyan color (RGB: 0, 255, 255).
+    /// </summary>
+    Cyan,
+
+    /// <summary>
+    /// Pink color (RGB: 255, 105, 180).
+    /// </summary>
+    Pink,
+
+    /// <summary>
+    /// White color (RGB: 255, 255, 255).
+    /// </summary>
+    White,
+
+    /// <summary>
+    /// Gold color (RGB: 255, 215, 0).
+    /// </summary>
+    Gold,
+
+    /// <summary>
     /// A randomly generated RGB color.
     /// </summary>
     Random

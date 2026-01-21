@@ -30,6 +30,9 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
     private readonly Dispatcher _uiDispatcher;
     private readonly object _simulationLock = new();
     
+    // Shared gravity reference for dynamic updates
+    private readonly PoseIntegratorCallbacks.GravityReference _gravityRef;
+    
     private Simulation _simulation = null!;
     private volatile bool _isRunning;
     private volatile bool _disposed;
@@ -84,7 +87,11 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
     public int ActiveBodyCount => _simulation?.Bodies.ActiveSet.Count ?? 0;
 
     /// <inheritdoc/>
-    public double Gravity { get; set; } = PhysicsConstants.DefaultGravity;
+    public double Gravity
+    {
+        get => -_gravityRef.GravityZ;
+        set => _gravityRef.GravityZ = -(float)value;
+    }
 
     /// <inheritdoc/>
     public double GroundLevel
@@ -125,6 +132,9 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
         _uiDispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
         _bufferPool = new BufferPool();
         _threadDispatcher = new ThreadDispatcher(Math.Max(1, Environment.ProcessorCount - 1));
+        
+        // Create shared gravity reference (negative because gravity pulls down in -Z)
+        _gravityRef = new PoseIntegratorCallbacks.GravityReference(-(float)PhysicsConstants.DefaultGravity);
 
         InitializeSimulation();
 
@@ -139,7 +149,7 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
     private void InitializeSimulation()
     {
         var narrowPhaseCallbacks = NarrowPhaseCallbacks.CreateDefault();
-        var poseIntegratorCallbacks = PoseIntegratorCallbacks.CreateDefault((float)Gravity);
+        var poseIntegratorCallbacks = PoseIntegratorCallbacks.CreateWithReference(_gravityRef);
         
         _simulation = Simulation.Create(
             _bufferPool,
@@ -404,7 +414,7 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
             }
             
             try { operation?.Invoke(); }
-            catch (Exception ex) 
+            catch (Exception ex)
             { 
                 System.Diagnostics.Debug.WriteLine($"Physics operation failed: {ex.Message}"); 
             }

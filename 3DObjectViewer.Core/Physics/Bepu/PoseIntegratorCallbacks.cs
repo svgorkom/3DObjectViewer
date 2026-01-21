@@ -14,7 +14,18 @@ namespace _3DObjectViewer.Core.Physics.Bepu;
 /// </remarks>
 internal struct PoseIntegratorCallbacks : IPoseIntegratorCallbacks
 {
-    private readonly float _gravityZ;
+    /// <summary>
+    /// Shared gravity value that can be updated at runtime.
+    /// Using a class wrapper to allow the struct to reference mutable state.
+    /// </summary>
+    internal sealed class GravityReference
+    {
+        public float GravityZ;
+        
+        public GravityReference(float gravityZ) => GravityZ = gravityZ;
+    }
+    
+    private readonly GravityReference _gravityRef;
     private Vector<float> _gravityWideDt;
     private Vector<float> _linearDampingDt;
     private Vector<float> _angularDampingDt;
@@ -34,12 +45,12 @@ internal struct PoseIntegratorCallbacks : IPoseIntegratorCallbacks
     public readonly bool IntegrateVelocityForKinematics => false;
 
     /// <summary>
-    /// Creates a pose integrator with the specified gravity.
+    /// Creates a pose integrator with the specified gravity reference.
     /// </summary>
-    /// <param name="gravity">Gravity vector (typically negative Z for downward).</param>
-    public PoseIntegratorCallbacks(Vector3 gravity) : this()
+    /// <param name="gravityRef">Reference to the gravity value (allows runtime updates).</param>
+    public PoseIntegratorCallbacks(GravityReference gravityRef) : this()
     {
-        _gravityZ = gravity.Z;
+        _gravityRef = gravityRef;
         LinearDampingPerSecond = 0.995f;  // Very slight air resistance
         AngularDampingPerSecond = 0.99f;  // Slightly more to prevent infinite spinning
     }
@@ -48,11 +59,23 @@ internal struct PoseIntegratorCallbacks : IPoseIntegratorCallbacks
     /// Creates callbacks with default realistic damping.
     /// </summary>
     /// <param name="gravityMagnitude">Gravity magnitude (positive, will be applied as -Z).</param>
-    public static PoseIntegratorCallbacks CreateDefault(float gravityMagnitude) => new(new Vector3(0, 0, -gravityMagnitude))
-    {
-        LinearDampingPerSecond = 0.995f,
-        AngularDampingPerSecond = 0.99f
-    };
+    public static PoseIntegratorCallbacks CreateDefault(float gravityMagnitude) => 
+        new(new GravityReference(-gravityMagnitude))
+        {
+            LinearDampingPerSecond = 0.995f,
+            AngularDampingPerSecond = 0.99f
+        };
+    
+    /// <summary>
+    /// Creates callbacks with a shared gravity reference for runtime updates.
+    /// </summary>
+    /// <param name="gravityRef">Shared gravity reference.</param>
+    public static PoseIntegratorCallbacks CreateWithReference(GravityReference gravityRef) => 
+        new(gravityRef)
+        {
+            LinearDampingPerSecond = 0.995f,
+            AngularDampingPerSecond = 0.99f
+        };
 
     public void Initialize(Simulation simulation)
     {
@@ -60,7 +83,8 @@ internal struct PoseIntegratorCallbacks : IPoseIntegratorCallbacks
 
     public void PrepareForIntegration(float dt)
     {
-        _gravityWideDt = Vector.Create(_gravityZ * dt);
+        // Read current gravity value each frame (allows dynamic updates)
+        _gravityWideDt = Vector.Create(_gravityRef.GravityZ * dt);
         
         // Apply damping as power of dt to be frame-rate independent
         float linearDamping = MathF.Pow(LinearDampingPerSecond, dt);

@@ -5,10 +5,46 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:converters="clr-namespace:_3DObjectViewer.Core.Infrastructure.Converters;assembly=3DObjectViewer.Core"
              mc:Ignorable="d" 
-             d:DesignHeight="900" d:DesignWidth="220">
+             d:DesignHeight="1100" d:DesignWidth="220">
     <UserControl.Resources>
         <converters:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        
+        <!-- Color swatch style -->
+        <Style x:Key="ColorSwatchRadioButton" TargetType="RadioButton">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="border" 
+                                Width="24" Height="24" 
+                                BorderThickness="2" 
+                                BorderBrush="Gray" 
+                                CornerRadius="3"
+                                Margin="2"
+                                Cursor="Hand">
+                            <Border.Background>
+                                <SolidColorBrush Color="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            </Border.Background>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="White"/>
+                                <Setter TargetName="border" Property="BorderThickness" Value="3"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="LightGray"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
+        <!-- Material button style -->
+        <Style x:Key="MaterialRadioButton" TargetType="RadioButton">
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Padding" Value="5,3"/>
+        </Style>
     </UserControl.Resources>
     
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -45,31 +81,100 @@
                     <Button Content="Add Cylinder(s)" Command="{Binding Objects.AddCylinderCommand}" Margin="0,0,0,5"/>
                     <Button Content="Add Cone(s)" Command="{Binding Objects.AddConeCommand}" Margin="0,0,0,5"/>
                     <Button Content="Add Torus(es)" Command="{Binding Objects.AddTorusCommand}" Margin="0,0,0,5"/>
+                    
+                    <Separator Margin="0,5"/>
+                    
+                    <!-- Random Objects Button - stands out with different styling -->
+                    <Button Command="{Binding Objects.AddRandomCommand}" 
+                            Margin="0,0,0,5"
+                            Background="#E8F5E9"
+                            FontWeight="SemiBold">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Add Random Mix" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </GroupBox>
 
             <!-- New Object Settings -->
             <GroupBox Header="New Object Settings" Margin="0,0,0,10">
                 <StackPanel Margin="5">
-                    <TextBlock Text="Color:" Margin="0,0,0,3"/>
+                    <!-- Color Selection with Swatches -->
+                    <TextBlock Text="Color:" Margin="0,0,0,5" FontWeight="SemiBold"/>
+                    <WrapPanel Margin="0,0,0,8">
+                        <RadioButton GroupName="Colors" Tag="Red"
+                                     Style="{StaticResource ColorSwatchRadioButton}"
+                                     ToolTip="Red"
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Red}"/>
+                        <RadioButton GroupName="Colors" Tag="Green"
+                                     Style="{StaticResource ColorSwatchRadioButton}"
+                                     ToolTip="Green"
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Green}"/>
+                        <RadioButton GroupName="Colors" Tag="Blue"
+                                     Style="{StaticResource ColorSwatchRadioButton}"
+                                     ToolTip="Blue"
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Blue}"/>
+                        <RadioButton GroupName="Colors" Tag="Yellow"
+                                     Style="{StaticResource ColorSwatchRadioButton}"
+                                     ToolTip="Yellow"
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Yellow}"/>
+                        <RadioButton GroupName="Colors" Tag="Orange"
+                                     Style="{StaticResource ColorSwatchRadioButton}"
+                                     ToolTip="Orange"
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Orange}"/>
+                        <RadioButton GroupName="Colors" Tag="Purple"
+                                     Style="{StaticResource ColorSwatchRadioButton}"
+                                     ToolTip="Purple"
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Purple}"/>
+                        <RadioButton GroupName="Colors" Tag="Cyan"
+                                     Style="{StaticResource ColorSwatchRadioButton}"
+                                     ToolTip="Cyan"
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Cyan}"/>
+                        <RadioButton GroupName="Colors" Tag="HotPink"
+                                     Style="{StaticResource ColorSwatchRadioButton}"
+                                     ToolTip="Pink"
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Pink}"/>
+                        <RadioButton GroupName="Colors" Tag="White"
+                                     Style="{StaticResource ColorSwatchRadioButton}"
+                                     ToolTip="White"
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=White}"/>
+                        <RadioButton GroupName="Colors" Tag="Gold"
+                                     Style="{StaticResource ColorSwatchRadioButton}"
+                                     ToolTip="Gold"
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Gold}"/>
+                    </WrapPanel>
+                    <RadioButton Content="Random Color" GroupName="Colors" 
+                                 IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Random}"
+                                 Margin="0,0,0,8"/>
+                    
+                    <Separator Margin="0,5"/>
+                    
+                    <!-- Material Type Selection -->
+                    <TextBlock Text="Material:" Margin="0,5,0,5" FontWeight="SemiBold"/>
                     <StackPanel Margin="0,0,0,5">
-                        <RadioButton Content="Red" GroupName="Colors" 
-                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Red}" 
-                                     Margin="0,0,0,2"/>
-                        <RadioButton Content="Green" GroupName="Colors" 
-                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Green}" 
-                                     Margin="0,0,0,2"/>
-                        <RadioButton Content="Blue" GroupName="Colors" 
-                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Blue}" 
-                                     Margin="0,0,0,2"/>
-                        <RadioButton Content="Yellow" GroupName="Colors" 
-                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Yellow}" 
-                                     Margin="0,0,0,2"/>
-                        <RadioButton Content="Random" GroupName="Colors" 
-                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Random}"/>
+                        <RadioButton Content="Shiny (Plastic)" GroupName="Materials" 
+                                     Style="{StaticResource MaterialRadioButton}"
+                                     IsChecked="{Binding Objects.SelectedMaterialStyle, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Shiny}"/>
+                        <RadioButton Content="Metallic" GroupName="Materials" 
+                                     Style="{StaticResource MaterialRadioButton}"
+                                     IsChecked="{Binding Objects.SelectedMaterialStyle, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Metallic}"/>
+                        <RadioButton Content="Matte" GroupName="Materials" 
+                                     Style="{StaticResource MaterialRadioButton}"
+                                     IsChecked="{Binding Objects.SelectedMaterialStyle, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Matte}"/>
+                        <RadioButton Content="Glass" GroupName="Materials" 
+                                     Style="{StaticResource MaterialRadioButton}"
+                                     IsChecked="{Binding Objects.SelectedMaterialStyle, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Glass}"/>
+                        <RadioButton Content="Glowing" GroupName="Materials" 
+                                     Style="{StaticResource MaterialRadioButton}"
+                                     IsChecked="{Binding Objects.SelectedMaterialStyle, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Glowing}"/>
+                        <RadioButton Content="Neon" GroupName="Materials" 
+                                     Style="{StaticResource MaterialRadioButton}"
+                                     IsChecked="{Binding Objects.SelectedMaterialStyle, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Neon}"/>
                     </StackPanel>
                     
-                    <TextBlock Text="Size:"/>
+                    <Separator Margin="0,5"/>
+                    
+                    <TextBlock Text="Size:" Margin="0,5,0,0"/>
                     <Slider Minimum="0.5" Maximum="3" Value="{Binding Objects.ObjectSize}" 
                             TickFrequency="0.5" IsSnapToTickEnabled="True"/>
                     <TextBlock Text="{Binding Objects.ObjectSize, StringFormat={}{0:F1}}" HorizontalAlignment="Center"/>
@@ -86,9 +191,19 @@
                 <StackPanel Margin="5">
                     <CheckBox Content="Enable Physics" IsChecked="{Binding PhysicsEnabled}" Margin="0,0,0,5"/>
                     
-                    <TextBlock Text="Gravity:" Margin="0,5,0,0"/>
-                    <Slider Minimum="1" Maximum="30" Value="{Binding Gravity}" 
-                            TickFrequency="1" SmallChange="0.5"/>
+                    <TextBlock Text="Gravity Strength:" Margin="0,5,0,0"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Low" FontSize="10" VerticalAlignment="Center" Foreground="Gray"/>
+                        <Slider Grid.Column="1" Minimum="1" Maximum="30" Value="{Binding Gravity}" 
+                                TickFrequency="1" SmallChange="0.5" Margin="5,0"
+                                IsDirectionReversed="False"/>
+                        <TextBlock Grid.Column="2" Text="High" FontSize="10" VerticalAlignment="Center" Foreground="Gray"/>
+                    </Grid>
                     <TextBlock Text="{Binding Gravity, StringFormat={}{0:F1} m/s2}" HorizontalAlignment="Center"/>
                     
                     <Button Content="Drop All Objects" Command="{Binding DropAllCommand}" Margin="0,10,0,0"/>
@@ -99,7 +214,7 @@
             <GroupBox Header="Selected Object" Margin="0,0,0,10" 
                       Visibility="{Binding Selection.HasSelection, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel Margin="5">
-                    <Button Content="Apply Color" Command="{Binding Selection.ApplyColorToSelectedCommand}" Margin="0,0,0,5"/>
+                    <Button Content="Apply Color &amp; Material" Command="{Binding Selection.ApplyColorToSelectedCommand}" Margin="0,0,0,5"/>
                     
                     <!-- Position Controls -->
                     <TextBlock Text="Position X:" Margin="0,5,0,0"/>
@@ -130,15 +245,15 @@
                     <!-- Rotation Controls -->
                     <TextBlock Text="Rotation X:" Margin="0,5,0,0"/>
                     <Slider Minimum="-180" Maximum="180" Value="{Binding Selection.SelectedObjectRotationX}"/>
-                    <TextBlock Text="{Binding Selection.SelectedObjectRotationX, StringFormat={}{0:F0}}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding Selection.SelectedObjectRotationX, StringFormat={}{0:F0} deg}" HorizontalAlignment="Center"/>
                     
                     <TextBlock Text="Rotation Y:" Margin="0,5,0,0"/>
                     <Slider Minimum="-180" Maximum="180" Value="{Binding Selection.SelectedObjectRotationY}"/>
-                    <TextBlock Text="{Binding Selection.SelectedObjectRotationY, StringFormat={}{0:F0}}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding Selection.SelectedObjectRotationY, StringFormat={}{0:F0} deg}" HorizontalAlignment="Center"/>
                     
                     <TextBlock Text="Rotation Z:" Margin="0,5,0,0"/>
                     <Slider Minimum="-180" Maximum="180" Value="{Binding Selection.SelectedObjectRotationZ}"/>
-                    <TextBlock Text="{Binding Selection.SelectedObjectRotationZ, StringFormat={}{0:F0}}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding Selection.SelectedObjectRotationZ, StringFormat={}{0:F0} deg}" HorizontalAlignment="Center"/>
                     
                     <Separator Margin="0,8"/>
                     

@@ -31,6 +31,10 @@ public sealed class BepuPhysicsEngine : IPhysicsEngine
     private readonly BufferPool _bufferPool;
     private readonly ThreadDispatcher _threadDispatcher;
     private readonly DispatcherTimer _timer;
+    
+    // Shared gravity reference for dynamic updates
+    private readonly PoseIntegratorCallbacks.GravityReference _gravityRef;
+    
     private Simulation _simulation = null!;
     private DateTime _lastUpdate;
     private bool _isRunning;
@@ -62,7 +66,11 @@ public sealed class BepuPhysicsEngine : IPhysicsEngine
     public int ActiveBodyCount => _simulation?.Bodies.ActiveSet.Count ?? 0;
 
     /// <inheritdoc/>
-    public double Gravity { get; set; } = PhysicsConstants.DefaultGravity;
+    public double Gravity
+    {
+        get => -_gravityRef.GravityZ;
+        set => _gravityRef.GravityZ = -(float)value;
+    }
 
     /// <inheritdoc/>
     public double GroundLevel
@@ -102,6 +110,9 @@ public sealed class BepuPhysicsEngine : IPhysicsEngine
     {
         _bufferPool = new BufferPool();
         _threadDispatcher = new ThreadDispatcher(Environment.ProcessorCount);
+        
+        // Create shared gravity reference (negative because gravity pulls down in -Z)
+        _gravityRef = new PoseIntegratorCallbacks.GravityReference(-(float)PhysicsConstants.DefaultGravity);
 
         InitializeSimulation();
 
@@ -116,7 +127,7 @@ public sealed class BepuPhysicsEngine : IPhysicsEngine
     private void InitializeSimulation()
     {
         var narrowPhaseCallbacks = NarrowPhaseCallbacks.CreateDefault();
-        var poseIntegratorCallbacks = PoseIntegratorCallbacks.CreateDefault((float)Gravity);
+        var poseIntegratorCallbacks = PoseIntegratorCallbacks.CreateWithReference(_gravityRef);
         var solveDescription = new SolveDescription(8, 1);
 
         _simulation = Simulation.Create(

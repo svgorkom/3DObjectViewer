@@ -8,7 +8,9 @@
 
 | Feature | Description |
 |---------|-------------|
-| **Object Creation** | Add 3D primitives (cubes, spheres, cylinders, cones, toruses) with customizable size and color |
+| **Object Creation** | Add 3D primitives (cubes, spheres, cylinders, cones, toruses) with customizable size, color, and material |
+| **Material Styles** | Choose from 6 material types: Shiny, Metallic, Matte, Glass, Glowing, and Neon |
+| **Color Palette** | 10 preset colors (Red, Green, Blue, Yellow, Orange, Purple, Cyan, Pink, White, Gold) plus Random |
 | **Batch Drop** | Drop multiple objects simultaneously (1-20 at once) |
 | **Physics Simulation** | Objects fall under gravity, collide with each other and boundaries, and come to rest naturally |
 | **Object Manipulation** | Select objects, drag to move them, adjust position/rotation/scale via sliders |
@@ -19,6 +21,78 @@
 - .NET 10 (Windows)
 - WPF (Windows Presentation Foundation)
 - C# 14.0
+
+---
+
+## Visual System
+
+### Material Styles
+
+The application supports 6 distinct material styles for objects:
+
+```mermaid
+flowchart LR
+    subgraph Materials["Material Styles"]
+        Shiny["Shiny<br/>(Plastic-like)"]
+        Metallic["Metallic<br/>(Reflective)"]
+        Matte["Matte<br/>(Diffuse only)"]
+        Glass["Glass<br/>(Semi-transparent)"]
+        Glowing["Glowing<br/>(Emissive)"]
+        Neon["Neon<br/>(Bright emission)"]
+    end
+```
+
+| Style | Diffuse | Specular | Emissive | Description |
+|-------|---------|----------|----------|-------------|
+| **Shiny** | Full color | White, power 40 | Subtle (30 alpha) | Standard plastic appearance |
+| **Metallic** | Dark (30%) | Colored, power 100 | Subtle (40 alpha) | Highly reflective metal |
+| **Matte** | Full color | None | Very subtle (15 alpha) | Non-reflective surface |
+| **Glass** | Semi-transparent (120 alpha) | White, power 120 | Subtle (50 alpha) | Translucent with reflections |
+| **Glowing** | Dim (40%) | White, power 20 | Strong (200 alpha) | Self-illuminating appearance |
+| **Neon** | Very dark (20%) | Colored, power 60 | Maximum | Bright glowing effect |
+
+### Color Palette
+
+```mermaid
+flowchart LR
+    subgraph Colors["Available Colors"]
+        Red["Red"]
+        Green["Green"]
+        Blue["Blue"]
+        Yellow["Yellow"]
+        Orange["Orange"]
+        Purple["Purple"]
+        Cyan["Cyan"]
+        Pink["Pink"]
+        White["White"]
+        Gold["Gold"]
+        Random["Random"]
+    end
+```
+
+### Material Caching
+
+Materials are cached for performance:
+
+```mermaid
+flowchart TB
+    subgraph MaterialCreation["Material Creation Flow"]
+        Request[CreateMaterial Request]
+        Check{Is Random Color?}
+        Lookup{In Cache?}
+        Create[Create New Material]
+        Cache[Add to Cache]
+        Return[Return Material]
+    end
+    
+    Request --> Check
+    Check -->|Yes| Create
+    Check -->|No| Lookup
+    Lookup -->|Yes| Return
+    Lookup -->|No| Create
+    Create --> Cache
+    Cache --> Return
+```
 
 ---
 

@@ -9,6 +9,18 @@ using HelixToolkit.Wpf;
 namespace _3DObjectViewer.ViewModels;
 
 /// <summary>
+/// Defines the types of 3D objects that can be created.
+/// </summary>
+public enum ObjectType
+{
+    Cube,
+    Sphere,
+    Cylinder,
+    Cone,
+    Torus
+}
+
+/// <summary>
 /// ViewModel for managing 3D object creation and settings.
 /// </summary>
 public class ObjectsViewModel : ViewModelBase
@@ -16,11 +28,17 @@ public class ObjectsViewModel : ViewModelBase
     private readonly Random _random = new();
     private double _objectSize = 1.0;
     private ObjectColor _selectedColor = ObjectColor.Red;
+    private MaterialStyle _selectedMaterialStyle = MaterialStyle.Shiny;
     private double _dropHeight = 5.0;
     private int _dropCount = 1;
     
-    // Cached frozen materials for common colors to avoid recreating brushes
-    private static readonly Dictionary<ObjectColor, Material> FrozenMaterials = CreateFrozenMaterials();
+    // Cached frozen materials for common color/material combinations
+    private static readonly Dictionary<(ObjectColor, MaterialStyle), Material> CachedMaterials = new();
+    private static readonly object CacheLock = new();
+    
+    // All available object types for random selection
+    private static readonly ObjectType[] AllObjectTypes = 
+        [ObjectType.Cube, ObjectType.Sphere, ObjectType.Cylinder, ObjectType.Cone, ObjectType.Torus];
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ObjectsViewModel"/> class.
@@ -35,19 +53,26 @@ public class ObjectsViewModel : ViewModelBase
         AddCylinderCommand = new RelayCommand(AddCylinders);
         AddConeCommand = new RelayCommand(AddCones);
         AddTorusCommand = new RelayCommand(AddToruses);
+        AddRandomCommand = new RelayCommand(AddRandomObjects);
     }
-    
-    private static Dictionary<ObjectColor, Material> CreateFrozenMaterials()
+
+    #region Material Creation
+
+    /// <summary>
+    /// Creates a material based on the specified color and material style.
+    /// </summary>
+    private static Material CreateMaterialForStyle(Color color, MaterialStyle materialStyle)
     {
-        var materials = new Dictionary<ObjectColor, Material>
+        return materialStyle switch
         {
-            [ObjectColor.Red] = CreateShinyMaterial(Colors.Red),
-            [ObjectColor.Green] = CreateShinyMaterial(Colors.Green),
-            [ObjectColor.Blue] = CreateShinyMaterial(Colors.Blue),
-            [ObjectColor.Yellow] = CreateShinyMaterial(Colors.Yellow)
+            MaterialStyle.Shiny => CreateShinyMaterial(color),
+            MaterialStyle.Metallic => CreateMetallicMaterial(color),
+            MaterialStyle.Matte => CreateMatteMaterial(color),
+            MaterialStyle.Glass => CreateGlassMaterial(color),
+            MaterialStyle.Glowing => CreateGlowingMaterial(color),
+            MaterialStyle.Neon => CreateNeonMaterial(color),
+            _ => CreateShinyMaterial(color)
         };
-        
-        return materials;
     }
 
     /// <summary>
@@ -70,6 +95,132 @@ public class ObjectsViewModel : ViewModelBase
         materialGroup.Freeze();
         return materialGroup;
     }
+
+    /// <summary>
+    /// Creates a highly reflective metallic material.
+    /// </summary>
+    private static Material CreateMetallicMaterial(Color color)
+    {
+        var materialGroup = new MaterialGroup();
+        
+        // Darker diffuse for metallic look
+        var darkColor = Color.FromRgb(
+            (byte)(color.R * 0.3),
+            (byte)(color.G * 0.3),
+            (byte)(color.B * 0.3));
+        materialGroup.Children.Add(new DiffuseMaterial(new SolidColorBrush(darkColor)));
+        
+        // Strong colored specular for metallic reflection
+        var specColor = Color.FromRgb(
+            (byte)Math.Min(255, color.R + 50),
+            (byte)Math.Min(255, color.G + 50),
+            (byte)Math.Min(255, color.B + 50));
+        materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(specColor), 100));
+        
+        // Subtle emissive for shine
+        var emissiveColor = Color.FromArgb(40, color.R, color.G, color.B);
+        materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(emissiveColor)));
+        
+        materialGroup.Freeze();
+        return materialGroup;
+    }
+
+    /// <summary>
+    /// Creates a matte material with no specular reflection.
+    /// </summary>
+    private static Material CreateMatteMaterial(Color color)
+    {
+        var materialGroup = new MaterialGroup();
+        
+        // Only diffuse, no specular
+        materialGroup.Children.Add(new DiffuseMaterial(new SolidColorBrush(color)));
+        
+        // Very subtle emissive to prevent completely dark areas
+        var emissiveColor = Color.FromArgb(15, color.R, color.G, color.B);
+        materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(emissiveColor)));
+        
+        materialGroup.Freeze();
+        return materialGroup;
+    }
+
+    /// <summary>
+    /// Creates a semi-transparent glass-like material.
+    /// </summary>
+    private static Material CreateGlassMaterial(Color color)
+    {
+        var materialGroup = new MaterialGroup();
+        
+        // Semi-transparent diffuse
+        var transparentColor = Color.FromArgb(120, color.R, color.G, color.B);
+        materialGroup.Children.Add(new DiffuseMaterial(new SolidColorBrush(transparentColor)));
+        
+        // Strong white specular for glass reflection
+        materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(Colors.White), 120));
+        
+        // Subtle emissive for internal glow
+        var emissiveColor = Color.FromArgb(50, color.R, color.G, color.B);
+        materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(emissiveColor)));
+        
+        materialGroup.Freeze();
+        return materialGroup;
+    }
+
+    /// <summary>
+    /// Creates an emissive material that appears to glow.
+    /// </summary>
+    private static Material CreateGlowingMaterial(Color color)
+    {
+        var materialGroup = new MaterialGroup();
+        
+        // Subtle diffuse
+        var dimColor = Color.FromRgb(
+            (byte)(color.R * 0.4),
+            (byte)(color.G * 0.4),
+            (byte)(color.B * 0.4));
+        materialGroup.Children.Add(new DiffuseMaterial(new SolidColorBrush(dimColor)));
+        
+        // Strong emissive for glow effect
+        var glowColor = Color.FromArgb(200, color.R, color.G, color.B);
+        materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(glowColor)));
+        
+        // Light specular
+        materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(Colors.White), 20));
+        
+        materialGroup.Freeze();
+        return materialGroup;
+    }
+
+    /// <summary>
+    /// Creates a bright neon material with strong emission.
+    /// </summary>
+    private static Material CreateNeonMaterial(Color color)
+    {
+        var materialGroup = new MaterialGroup();
+        
+        // Boost color intensity for neon effect
+        var brightColor = Color.FromRgb(
+            (byte)Math.Min(255, color.R + 30),
+            (byte)Math.Min(255, color.G + 30),
+            (byte)Math.Min(255, color.B + 30));
+        
+        // Minimal diffuse
+        var darkColor = Color.FromRgb(
+            (byte)(color.R * 0.2),
+            (byte)(color.G * 0.2),
+            (byte)(color.B * 0.2));
+        materialGroup.Children.Add(new DiffuseMaterial(new SolidColorBrush(darkColor)));
+        
+        // Maximum emissive for neon glow
+        materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(brightColor)));
+        
+        // Colored specular
+        materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(brightColor), 60));
+        
+        materialGroup.Freeze();
+        return materialGroup;
+    }
+
+    #endregion
 
     /// <summary>
     /// Occurs when a new object is added and needs physics.
@@ -97,6 +248,15 @@ public class ObjectsViewModel : ViewModelBase
     {
         get => _selectedColor;
         set => SetProperty(ref _selectedColor, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the material type for newly created objects.
+    /// </summary>
+    public MaterialStyle SelectedMaterialStyle
+    {
+        get => _selectedMaterialStyle;
+        set => SetProperty(ref _selectedMaterialStyle, value);
     }
 
     /// <summary>
@@ -142,6 +302,11 @@ public class ObjectsViewModel : ViewModelBase
     /// </summary>
     public ICommand AddTorusCommand { get; }
 
+    /// <summary>
+    /// Gets the command to add random objects to the scene.
+    /// </summary>
+    public ICommand AddRandomCommand { get; }
+
     #region Batch Add Methods
 
     private void AddCubes()
@@ -181,6 +346,17 @@ public class ObjectsViewModel : ViewModelBase
         for (int i = 0; i < DropCount; i++)
         {
             AddTorus();
+        }
+    }
+
+    /// <summary>
+    /// Adds multiple random objects. Each object gets a randomly selected type.
+    /// </summary>
+    private void AddRandomObjects()
+    {
+        for (int i = 0; i < DropCount; i++)
+        {
+            AddRandomObject();
         }
     }
 
@@ -260,21 +436,60 @@ public class ObjectsViewModel : ViewModelBase
         ObjectAdded?.Invoke(torus, position);
     }
 
+    // Adds a random object type at a random position using the current object size
+    private void AddRandomObject()
+    {
+        // Choose a random object type
+        var randomObjectType = AllObjectTypes[_random.Next(AllObjectTypes.Length)];
+        
+        switch (randomObjectType)
+        {
+            case ObjectType.Cube:
+                AddCube();
+                break;
+            case ObjectType.Sphere:
+                AddSphere();
+                break;
+            case ObjectType.Cylinder:
+                AddCylinder();
+                break;
+            case ObjectType.Cone:
+                AddCone();
+                break;
+            case ObjectType.Torus:
+                AddTorus();
+                break;
+        }
+    }
+
     #endregion
 
     /// <summary>
-    /// Creates a material with the currently selected color.
+    /// Creates a material with the currently selected color and material type.
     /// </summary>
     public Material CreateMaterial()
     {
-        // Use cached frozen material for standard colors (better GPU performance)
-        if (SelectedColor != ObjectColor.Random && FrozenMaterials.TryGetValue(SelectedColor, out var cachedMaterial))
+        var color = GetColorValue();
+        
+        // Random colors always get fresh materials
+        if (SelectedColor == ObjectColor.Random)
         {
-            return cachedMaterial;
+            return CreateMaterialForStyle(color, SelectedMaterialStyle);
         }
         
-        // Random color needs a new material each time
-        return CreateShinyMaterial(GetColorValue());
+        // Use cached materials for standard color/material combinations
+        var key = (SelectedColor, SelectedMaterialStyle);
+        lock (CacheLock)
+        {
+            if (CachedMaterials.TryGetValue(key, out var cachedMaterial))
+            {
+                return cachedMaterial;
+            }
+            
+            var material = CreateMaterialForStyle(color, SelectedMaterialStyle);
+            CachedMaterials[key] = material;
+            return material;
+        }
     }
 
     private Color GetColorValue()
@@ -285,10 +500,16 @@ public class ObjectsViewModel : ViewModelBase
             ObjectColor.Green => Colors.Green,
             ObjectColor.Blue => Colors.Blue,
             ObjectColor.Yellow => Colors.Yellow,
+            ObjectColor.Orange => Colors.Orange,
+            ObjectColor.Purple => Colors.Purple,
+            ObjectColor.Cyan => Colors.Cyan,
+            ObjectColor.Pink => Colors.HotPink,
+            ObjectColor.White => Colors.White,
+            ObjectColor.Gold => Colors.Gold,
             ObjectColor.Random => Color.FromRgb(
-                (byte)_random.Next(256),
-                (byte)_random.Next(256),
-                (byte)_random.Next(256)),
+                (byte)_random.Next(100, 256),  // Avoid too dark colors
+                (byte)_random.Next(100, 256),
+                (byte)_random.Next(100, 256)),
             _ => Colors.Gray
         };
     }
