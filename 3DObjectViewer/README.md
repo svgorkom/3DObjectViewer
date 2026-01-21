@@ -6,22 +6,32 @@ A WPF desktop application for creating, manipulating, and viewing 3D objects wit
 
 The solution is organized into two sibling projects:
 
-```
-repos/
-??? 3DObjectViewer.sln           # Solution file
-??? 3DObjectViewer/              # WPF Application
-?   ??? Views/
-?   ??? ViewModels/
-?   ??? Rendering/
-?   ??? Physics/
-?   ??? Services/
-?   ??? Design/
-??? 3DObjectViewer.Core/         # Core platform library
-    ??? Infrastructure/
-    ??? Physics/
-    ??? Rendering/Abstractions/
-    ??? Models/
-    ??? Helpers/
+```mermaid
+graph TB
+    subgraph Root["repos/"]
+        SLN[3DObjectViewer.sln]
+        
+        subgraph App["3DObjectViewer/"]
+            V[Views/]
+            VM[ViewModels/]
+            R[Rendering/]
+            P[Physics/]
+            S[Services/]
+            D[Design/]
+        end
+        
+        subgraph Core["3DObjectViewer.Core/"]
+            I[Infrastructure/]
+            CP[Physics/]
+            RA[Rendering/Abstractions/]
+            M[Models/]
+            H[Helpers/]
+        end
+    end
+    
+    SLN --> App
+    SLN --> Core
+    App --> Core
 ```
 
 ### 3DObjectViewer.Core (Platform Library)
@@ -62,12 +72,55 @@ The WPF application containing UI and renderer implementations:
 
 ### Design Patterns
 
+```mermaid
+flowchart TB
+    subgraph MVVM["MVVM Pattern"]
+        View[Views<br/>XAML]
+        ViewModel[ViewModels<br/>Logic]
+        Model[Models<br/>Data]
+        View <-->|Data Binding| ViewModel
+        ViewModel -->|Reads/Writes| Model
+    end
+    
+    subgraph Strategy["Strategy Pattern"]
+        IR[IRenderer Interface]
+        Helix[HelixWpfRenderer]
+        IR --> Helix
+    end
+    
+    subgraph Facade["Facade Pattern"]
+        SS[SceneService]
+        LS[LightingService]
+        ShadowS[ShadowService]
+        SS --> LS
+        SS --> ShadowS
+    end
+    
+    subgraph Observer["Observer Pattern"]
+        Events[Events]
+        Handlers[Event Handlers]
+        Events -->|Notify| Handlers
+    end
+```
+
 - **MVVM**: Clean separation of UI (Views), logic (ViewModels), and data (Models)
 - **Strategy Pattern**: Swappable renderer implementations via `IRenderer`
 - **Facade Pattern**: `SceneService` coordinates lighting and shadow services
 - **Observer Pattern**: Event-driven communication between components
 
 ### Key Dependencies
+
+```mermaid
+graph LR
+    App[3DObjectViewer]
+    Core[3DObjectViewer.Core]
+    Helix[HelixToolkit.Wpf]
+    Numerics[System.Numerics]
+    
+    App --> Core
+    App --> Helix
+    Core --> Numerics
+```
 
 - **HelixToolkit.Wpf**: 3D rendering and viewport controls
 - **System.Numerics**: SIMD-accelerated vector math
@@ -91,6 +144,16 @@ dotnet run --project 3DObjectViewer/3DObjectViewer.csproj
 ```
 
 ## Mouse Controls
+
+```mermaid
+flowchart LR
+    Click[Click] --> Select[Select object]
+    CtrlDrag[Ctrl + Drag] --> Move[Move object]
+    LeftDrag[Left-drag] --> Rotate[Rotate view]
+    RightDrag[Right-drag] --> Pan[Pan view]
+    Scroll[Scroll wheel] --> Zoom[Zoom]
+    Esc[Escape] --> Deselect[Deselect]
+```
 
 | Action | Control |
 |--------|---------|

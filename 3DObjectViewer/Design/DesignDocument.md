@@ -24,34 +24,47 @@
 
 ## Project Structure
 
-```
-3DObjectViewer/
-+-- ViewModels/                 # MVVM ViewModels
-|   +-- MainViewModel.cs        # Root ViewModel, orchestrates child VMs
-|   +-- ObjectsViewModel.cs     # Object creation and settings
-|   +-- SelectionViewModel.cs   # Selected object manipulation
-|   +-- LightingViewModel.cs    # Light source management
-|   +-- PerformanceStatsViewModel.cs  # FPS and statistics display
-+-- Views/
-|   +-- Controls/               # User controls
-|       +-- ObjectControlPanel.xaml     # Main control panel
-|       +-- LightingControlPanel.xaml   # Lighting controls
-+-- Rendering/
-|   +-- HelixWpf/               # HelixToolkit.Wpf implementation
-|   |   +-- HelixWpfRenderer.cs       # IRenderer implementation
-|   |   +-- HelixSceneObject.cs       # ISceneObject wrapper
-|   |   +-- HelixSceneObjects.cs      # Static factory methods
-|   +-- Services/
-|   |   +-- LightingService.cs        # Light management
-|   +-- RendererManager.cs      # Renderer lifecycle management
-|   +-- RendererFactory.cs      # Factory for creating renderers
-+-- Physics/
-|   +-- PhysicsHelper.cs        # Visual3D <-> RigidBody bridge
-+-- Services/
-|   +-- SceneService.cs         # Scene facade (lighting, shadows)
-+-- MainWindow.xaml             # Main application window
-+-- MainWindow.xaml.cs          # Window code-behind (mouse handling)
-+-- App.xaml                    # Application entry point
+```mermaid
+graph TB
+    subgraph "3DObjectViewer/"
+        subgraph "ViewModels/"
+            VM1[MainViewModel.cs]
+            VM2[ObjectsViewModel.cs]
+            VM3[SelectionViewModel.cs]
+            VM4[LightingViewModel.cs]
+            VM5[PerformanceStatsViewModel.cs]
+        end
+        
+        subgraph "Views/Controls/"
+            V1[ObjectControlPanel.xaml]
+            V2[LightingControlPanel.xaml]
+        end
+        
+        subgraph "Rendering/"
+            subgraph "HelixWpf/"
+                R1[HelixWpfRenderer.cs]
+                R2[HelixSceneObject.cs]
+                R3[HelixSceneObjects.cs]
+            end
+            subgraph "Services/"
+                RS1[LightingService.cs]
+            end
+            R4[RendererManager.cs]
+            R5[RendererFactory.cs]
+        end
+        
+        subgraph "Physics/"
+            P1[PhysicsHelper.cs]
+        end
+        
+        subgraph "Services/"
+            S1[SceneService.cs]
+        end
+        
+        MW[MainWindow.xaml]
+        MWC[MainWindow.xaml.cs]
+        APP[App.xaml]
+    end
 ```
 
 ---
@@ -60,57 +73,79 @@
 
 ### High-Level Architecture
 
-```
-+-----------------------------------------------------------------------------+
-|                           PRESENTATION LAYER                                |
-|  +------------------+  +-----------------------+  +------------------------+|
-|  |   MainWindow     |  |  ObjectControlPanel   |  |  LightingControlPanel  ||
-|  |   (XAML + C#)    |  |      (XAML)           |  |       (XAML)           ||
-|  +------------------+  +-----------------------+  +------------------------+|
-+-----------------------------------------------------------------------------+
-            |                      |                           |
-            | DataContext          | Bindings                  | Bindings
-            v                      v                           v
-+-----------------------------------------------------------------------------+
-|                            VIEWMODEL LAYER                                  |
-|  +-----------------------------------------------------------------------+  |
-|  |                         MainViewModel                                 |  |
-|  |  +------------------+  +-------------------+  +-----------------------+| |
-|  |  | ObjectsViewModel |  |SelectionViewModel |  |  LightingViewModel    || |
-|  |  | - AddCubeCommand |  | - SelectedObject  |  |  - LightSources       || |
-|  |  | - DropCount      |  | - Position X/Y/Z  |  |  - SelectedLight      || |
-|  |  | - ObjectSize     |  | - Scale           |  |  - Color, Intensity   || |
-|  |  | - SelectedColor  |  | - Rotation X/Y/Z  |  |  - Position           || |
-|  |  +------------------+  +-------------------+  +-----------------------+| |
-|  |  +-------------------------------------------------------------------+|  |
-|  |  |                 PerformanceStatsViewModel                         ||  |
-|  |  |  - FPS, FrameTime, ObjectCount, Triangles, Memory, Camera         ||  |
-|  |  +-------------------------------------------------------------------+|  |
-|  +-----------------------------------------------------------------------+  |
-+-----------------------------------------------------------------------------+
-            |                                              |
-            v                                              v
-+-----------------------------------+  +-----------------------------------+
-|         RENDERING LAYER           |  |        PHYSICS LAYER              |
-|  +-----------------------------+  |  |  +-----------------------------+  |
-|  |      RendererManager        |  |  |  |   PhysicsEngine             |  |
-|  |  +------------------------+ |  |  |  |  (ThreadedBepuPhysics)      |  |
-|  |  |     IRenderer          | |  |  |  +-----------------------------+  |
-|  |  |  +-------------------+ | |  |  |  +-----------------------------+  |
-|  |  |  | HelixWpfRenderer  | | |  |  |  |   PhysicsHelper             |  |
-|  |  |  +-------------------+ | |  |  |  |  (Visual <-> Body bridge)   |  |
-|  |  +------------------------+ |  |  |  +-----------------------------+  |
-|  +-----------------------------+  |  +-----------------------------------+
-|  +-----------------------------+  |
-|  |      SceneService           |  |
-|  |  - LightingService          |  |
-|  +-----------------------------+  |
-+-----------------------------------+
+```mermaid
+flowchart TB
+    subgraph Presentation["PRESENTATION LAYER"]
+        MW[MainWindow<br/>XAML + C#]
+        OCP[ObjectControlPanel<br/>XAML]
+        LCP[LightingControlPanel<br/>XAML]
+    end
+    
+    subgraph ViewModel["VIEWMODEL LAYER"]
+        MVM[MainViewModel]
+        subgraph ChildVMs["Child ViewModels"]
+            OVM[ObjectsViewModel<br/>• AddCubeCommand<br/>• DropCount<br/>• ObjectSize<br/>• SelectedColor]
+            SVM[SelectionViewModel<br/>• SelectedObject<br/>• Position X/Y/Z<br/>• Scale]
+            LVM[LightingViewModel<br/>• LightSources<br/>• SelectedLight<br/>• Color, Intensity]
+        end
+        PSVM[PerformanceStatsViewModel<br/>• FPS, FrameTime<br/>• ObjectCount, Triangles<br/>• Memory, Camera]
+    end
+    
+    subgraph Rendering["RENDERING LAYER"]
+        RM[RendererManager]
+        IR[IRenderer]
+        HWR[HelixWpfRenderer]
+        SS[SceneService]
+        LS[LightingService]
+    end
+    
+    subgraph Physics["PHYSICS LAYER"]
+        PE[PhysicsEngine<br/>ThreadedBepuPhysics]
+        PH[PhysicsHelper<br/>Visual ? Body bridge]
+    end
+    
+    MW -->|DataContext| MVM
+    OCP -->|Bindings| OVM
+    LCP -->|Bindings| LVM
+    
+    MVM --> OVM
+    MVM --> SVM
+    MVM --> LVM
+    MVM --> PSVM
+    
+    MVM --> RM
+    RM --> IR
+    IR --> HWR
+    SS --> LS
+    
+    MVM --> PE
+    MVM --> PH
 ```
 
 ### MVVM Pattern Implementation
 
-The application follows the MVVM (Model-View-ViewModel) pattern:
+```mermaid
+graph LR
+    subgraph View["View Layer"]
+        V1[MainWindow]
+        V2[Control Panels]
+    end
+    
+    subgraph ViewModel["ViewModel Layer"]
+        VM1[MainViewModel]
+        VM2[Child ViewModels]
+    end
+    
+    subgraph Model["Model Layer"]
+        M1[RigidBody]
+        M2[LightSource]
+    end
+    
+    V1 <-->|Data Binding| VM1
+    V2 <-->|Data Binding| VM2
+    VM1 -->|Reads/Writes| M1
+    VM2 -->|Reads/Writes| M2
+```
 
 | Layer | Components | Responsibilities |
 |-------|------------|------------------|
@@ -121,6 +156,70 @@ The application follows the MVVM (Model-View-ViewModel) pattern:
 ---
 
 ## ViewModels
+
+### ViewModel Hierarchy
+
+```mermaid
+classDiagram
+    class MainViewModel {
+        +ObjectsViewModel Objects
+        +SelectionViewModel Selection
+        +LightingViewModel Lighting
+        +PerformanceStatsViewModel PerformanceStats
+        +bool PhysicsEnabled
+        +double Gravity
+        +ObservableCollection~Visual3D~ SceneObjects
+        +ICommand ClearAllCommand
+        +ICommand ResetCameraCommand
+        +ICommand TogglePhysicsCommand
+        +ICommand DropAllCommand
+    }
+    
+    class ObjectsViewModel {
+        +int DropCount
+        +double ObjectSize
+        +ObjectColor SelectedColor
+        +double DropHeight
+        +ICommand AddCubeCommand
+        +ICommand AddSphereCommand
+        +ICommand AddCylinderCommand
+        +ICommand AddConeCommand
+        +ICommand AddTorusCommand
+    }
+    
+    class SelectionViewModel {
+        +Visual3D SelectedObject
+        +bool HasSelection
+        +double SelectedObjectPositionX
+        +double SelectedObjectPositionY
+        +double SelectedObjectPositionZ
+        +double SelectedObjectScale
+        +double SelectedObjectRotationX
+        +double SelectedObjectRotationY
+        +double SelectedObjectRotationZ
+    }
+    
+    class LightingViewModel {
+        +ObservableCollection~LightSource~ LightSources
+        +LightSource SelectedLight
+        +double AmbientIntensity
+    }
+    
+    class PerformanceStatsViewModel {
+        +double FPS
+        +double FrameTime
+        +int ObjectCount
+        +int TriangleCount
+        +int PhysicsBodies
+        +long MemoryUsage
+        +string CameraPosition
+    }
+    
+    MainViewModel *-- ObjectsViewModel
+    MainViewModel *-- SelectionViewModel
+    MainViewModel *-- LightingViewModel
+    MainViewModel *-- PerformanceStatsViewModel
+```
 
 ### MainViewModel
 
@@ -230,6 +329,39 @@ Displays real-time performance metrics.
 
 ## Rendering System
 
+### Rendering Architecture
+
+```mermaid
+flowchart TB
+    subgraph Abstraction["Abstraction Layer"]
+        IR[IRenderer Interface]
+        ISO[ISceneObject Interface]
+    end
+    
+    subgraph Implementation["HelixToolkit.Wpf Implementation"]
+        HWR[HelixWpfRenderer]
+        HSO[HelixSceneObject]
+        HSOs[HelixSceneObjects<br/>Static Factory]
+    end
+    
+    subgraph Visuals["Visual Types"]
+        BV[BoxVisual3D]
+        SV[SphereVisual3D]
+        PV[PipeVisual3D]
+        TCV[TruncatedConeVisual3D]
+        TV[TorusVisual3D]
+    end
+    
+    IR --> HWR
+    ISO --> HSO
+    HWR --> HSOs
+    HSOs --> BV
+    HSOs --> SV
+    HSOs --> PV
+    HSOs --> TCV
+    HSOs --> TV
+```
+
 ### HelixToolkit.Wpf Integration
 
 The application uses HelixToolkit.Wpf for 3D rendering, wrapped behind the `IRenderer` interface for potential future extensibility.
@@ -256,20 +388,48 @@ The application uses HelixToolkit.Wpf for 3D rendering, wrapped behind the `IRen
 
 **Solution:** The `PhysicsHelper` class uses a **normalize-once pattern**:
 
+```mermaid
+flowchart LR
+    subgraph Bad["? EXPENSIVE - Mesh Rebuild"]
+        A1[sphere.Center = newPosition]
+        A2[Triggers full mesh regeneration]
+    end
+    
+    subgraph Good["? CHEAP - Matrix Only"]
+        B1[sphere.Transform = TranslateTransform3D]
+        B2[Just matrix update]
+    end
+    
+    A1 --> A2
+    B1 --> B2
+```
 1. At creation: Move geometry to origin (triggers one mesh rebuild)
 2. Every frame: Only update `Transform` property (cheap matrix operation)
-
-```csharp
-// EXPENSIVE - triggers mesh rebuild
-sphere.Center = newPosition;  // DON'T DO THIS
-
-// CHEAP - just matrix update
-sphere.Transform = new TranslateTransform3D(x, y, z);  // DO THIS
-```
 
 ---
 
 ## Physics Integration
+
+### Physics Architecture
+
+```mermaid
+flowchart TB
+    subgraph Core["3DObjectViewer.Core"]
+        PE[PhysicsEngine]
+        RB[RigidBody]
+        SM[SimdMath<br/>SIMD Optimized]
+    end
+    
+    subgraph App["3DObjectViewer"]
+        PH[PhysicsHelper]
+        V3D[Visual3D Objects]
+    end
+    
+    V3D <-->|Bridge| PH
+    PH <-->|Create/Update| RB
+    RB --> PE
+    PE --> SM
+```
 
 ### PhysicsHelper
 
@@ -292,48 +452,42 @@ Bridges the gap between physics bodies and visual objects.
 
 ### Data Flow: Object Creation
 
-```
-User clicks "Add Sphere(s)"
-         |
-         v
-+-------------------------------------------------------------+
-| ObjectsViewModel.AddSpheres()                               |
-|   for each dropCount:                                       |
-|     1. Calculate random drop position                       |
-|     2. Create SphereVisual3D with material                  |
-|     3. Add to SceneObjects collection                       |
-|     4. Fire ObjectAdded event                               |
-+-------------------------------------------------------------+
-         |
-         v
-+-------------------------------------------------------------+
-| MainViewModel.OnObjectAdded(visual, position)               |
-|   1. PhysicsHelper.CreateRigidBody(visual, position)        |
-|      - Extracts dimensions from visual                      |
-|      - Normalizes visual (move to origin)                   |
-|      - Applies initial transform                            |
-|      - Returns configured RigidBody                         |
-|   2. PhysicsEngine.AddBody(body)                            |
-|      - Queued for physics thread processing                 |
-|   3. Store visual -> bodyId mapping                         |
-+-------------------------------------------------------------+
-         |
-         v
-+-------------------------------------------------------------+
-| PhysicsEngine (background thread)                           |
-|   1. Process pending operations (add body to simulation)    |
-|   2. Run physics timestep                                   |
-|   3. Collect body states                                    |
-|   4. BeginInvoke(ApplyResults)                              |
-+-------------------------------------------------------------+
-         |
-         v
-+-------------------------------------------------------------+
-| MainViewModel.OnPhysicsBodiesUpdated(bodies)                |
-|   for each body:                                            |
-|     PhysicsHelper.ApplyTransformToVisual(body)              |
-|       - Updates visual.Transform with position/rotation     |
-+-------------------------------------------------------------+
+```mermaid
+sequenceDiagram
+    participant User
+    participant OVM as ObjectsViewModel
+    participant MVM as MainViewModel
+    participant PH as PhysicsHelper
+    participant PE as PhysicsEngine
+    participant UI as UI Thread
+
+    User->>OVM: Click "Add Sphere(s)"
+    
+    loop For each dropCount
+        OVM->>OVM: Calculate random drop position
+        OVM->>OVM: Create SphereVisual3D with material
+        OVM->>OVM: Add to SceneObjects collection
+        OVM->>MVM: Fire ObjectAdded event
+    end
+    
+    MVM->>PH: CreateRigidBody(visual, position)
+    Note over PH: Extract dimensions from visual<br/>Normalize visual (move to origin)<br/>Apply initial transform
+    PH-->>MVM: Return configured RigidBody
+    
+    MVM->>PE: AddBody(body)
+    Note over PE: Queued for physics thread
+    
+    PE->>PE: Process pending operations
+    PE->>PE: Run physics timestep
+    PE->>PE: Collect body states
+    PE->>UI: BeginInvoke(ApplyResults)
+    
+    UI->>MVM: OnPhysicsBodiesUpdated(bodies)
+    
+    loop For each body
+        MVM->>PH: ApplyTransformToVisual(body)
+        Note over PH: Update visual.Transform<br/>with position/rotation
+    end
 ```
 
 ---
@@ -342,59 +496,88 @@ User clicks "Add Sphere(s)"
 
 ### Main Window Layout
 
-```
-+----------------------------------------------------------------------------+
-|  3D Object Viewer                                              [-][o][x]   |
-+----------------------------------------------------------------------------+
-| +----------------------------------------------------------+ +-----------+ |
-| |                                                          | |  Controls | |
-| |                                                          | |           | |
-| |                                                          | | [Add      | |
-| |                      3D Viewport                         | |  Objects] | |
-| |                                                          | |           | |
-| |                   (HelixViewport3D)                      | | [Settings]| |
-| |                                                          | |           | |
-| |                                                          | | [Physics] | |
-| |                                                          | |           | |
-| |                                                          | | [Selected | |
-| |                                                          | |  Object]  | |
-| |                                                          | |           | |
-| | +------------------------------------------------------+ | | [Scene]   | |
-| | | FPS: 60 | Frame: 16.7ms | Objects: 25 | Tris: 12.5k  | | |           | |
-| | +------------------------------------------------------+ | | [Help]    | |
-| +----------------------------------------------------------+ +-----------+ |
-+----------------------------------------------------------------------------+
+```mermaid
+flowchart TB
+    subgraph MainWindow["Main Window"]
+        subgraph Header["Title Bar"]
+            Title[3D Object Viewer]
+            Controls["[-][o][x]"]
+        end
+        
+        subgraph Content["Content Area"]
+            subgraph Viewport["3D Viewport (HelixViewport3D)"]
+                Scene[3D Scene]
+                subgraph Stats["Performance Stats"]
+                    FPS[FPS: 60]
+                    Frame[Frame: 16.7ms]
+                    Objects[Objects: 25]
+                    Tris[Tris: 12.5k]
+                end
+            end
+            
+            subgraph ControlPanel["Control Panel"]
+                AddObj[Add Objects]
+                Settings[Settings]
+                Physics[Physics]
+                Selected[Selected Object]
+                SceneCtrl[Scene]
+                Help[Help]
+            end
+        end
+    end
 ```
 
 ### Control Panel Sections
 
-**Add Objects:**
-- Drop Count slider (1-20)
-- Add Cube/Sphere/Cylinder/Cone/Torus buttons
-
-**New Object Settings:**
-- Color selection (Red/Green/Blue/Yellow/Random)
-- Size slider (0.5-3.0)
-- Drop Height slider (2-15m)
-
-**Physics:**
-- Enable Physics checkbox
-- Gravity slider (1-30 m/s^2)
-- Drop All Objects button
-
-**Selected Object:** (visible when object selected)
-- Apply Color button
-- Position X/Y/Z sliders
-- Scale slider
-- Rotation X/Y/Z sliders
-- Deselect button
-- Delete Object button
-
-**Scene:**
-- Clear All Objects button
-- Reset Camera button
+```mermaid
+flowchart TB
+    subgraph CP["Control Panel"]
+        subgraph AddObjects["Add Objects"]
+            DC[Drop Count: 1-20]
+            Buttons["Cube | Sphere | Cylinder | Cone | Torus"]
+        end
+        
+        subgraph Settings["New Object Settings"]
+            Color["Color: Red/Green/Blue/Yellow/Random"]
+            Size["Size: 0.5-3.0"]
+            Height["Drop Height: 2-15m"]
+        end
+        
+        subgraph Physics["Physics"]
+            Enable[Enable Physics ?]
+            Gravity["Gravity: 1-30 m/s²"]
+            DropAll[Drop All Objects]
+        end
+        
+        subgraph Selected["Selected Object (when selected)"]
+            ApplyColor[Apply Color]
+            Position["Position X/Y/Z"]
+            Scale["Scale"]
+            Rotation["Rotation X/Y/Z"]
+            Deselect[Deselect]
+            Delete[Delete Object]
+        end
+        
+        subgraph Scene["Scene"]
+            ClearAll[Clear All Objects]
+            ResetCam[Reset Camera]
+        end
+    end
+```
 
 ### Mouse Controls
+
+```mermaid
+flowchart LR
+    subgraph MouseActions["Mouse Controls"]
+        Click["Left-click on object"] --> Select["Select object"]
+        CtrlDrag["Ctrl + Left-drag"] --> Move["Move selected object"]
+        LeftDrag["Left-drag on background"] --> Rotate["Rotate camera"]
+        RightDrag["Right-drag"] --> Pan["Pan camera"]
+        Scroll["Scroll wheel"] --> Zoom["Zoom in/out"]
+        Escape["Escape key"] --> Deselect["Deselect object"]
+    end
+```
 
 | Action | Behavior |
 |--------|----------|
@@ -408,6 +591,26 @@ User clicks "Add Sphere(s)"
 ---
 
 ## Services
+
+### Service Architecture
+
+```mermaid
+classDiagram
+    class SceneService {
+        +LightingService Lighting
+        +UpdateAllLights(IEnumerable~LightSource~ sources)
+    }
+    
+    class LightingService {
+        +CreateDirectionalLight()
+        +CreatePointLight()
+        +CreateSpotLight()
+        +UpdateLightProperties()
+        +ManageLampVisuals()
+    }
+    
+    SceneService *-- LightingService
+```
 
 ### SceneService
 
@@ -434,6 +637,27 @@ Manages light visuals in the 3D scene:
 
 ## Dependencies
 
+```mermaid
+graph TB
+    subgraph App["3DObjectViewer"]
+        WPF[WPF Application]
+    end
+    
+    subgraph Core["3DObjectViewer.Core"]
+        Physics[Physics Engine]
+        Infrastructure[MVVM Infrastructure]
+    end
+    
+    subgraph External["External Packages"]
+        Helix[HelixToolkit.Wpf 2.x]
+        Numerics[System.Numerics]
+    end
+    
+    App --> Core
+    App --> Helix
+    Core --> Numerics
+```
+
 | Package | Version | Purpose |
 |---------|---------|---------|
 | HelixToolkit.Wpf | 2.x | 3D rendering and viewport |
@@ -445,32 +669,49 @@ Manages light visuals in the 3D scene:
 
 ### 1. Composition over Inheritance for ViewModels
 
-**Decision:** MainViewModel composes child ViewModels rather than inheriting.
-
-**Implementation:**
-```csharp
-public class MainViewModel : ViewModelBase
-{
-    public ObjectsViewModel Objects { get; }
-    public SelectionViewModel Selection { get; }
-    public LightingViewModel Lighting { get; }
-}
+```mermaid
+classDiagram
+    class MainViewModel {
+        +ObjectsViewModel Objects
+        +SelectionViewModel Selection
+        +LightingViewModel Lighting
+    }
+    
+    class ViewModelBase {
+        <<abstract>>
+        +OnPropertyChanged()
+    }
+    
+    ViewModelBase <|-- MainViewModel
+    ViewModelBase <|-- ObjectsViewModel
+    ViewModelBase <|-- SelectionViewModel
+    ViewModelBase <|-- LightingViewModel
+    
+    MainViewModel *-- ObjectsViewModel
+    MainViewModel *-- SelectionViewModel
+    MainViewModel *-- LightingViewModel
 ```
+
+**Decision:** MainViewModel composes child ViewModels rather than inheriting.
 
 **Benefit:** Each ViewModel has a single responsibility, easier to test and maintain.
 
 ### 2. Event-Based Communication
 
-**Decision:** ViewModels communicate via events, not direct method calls.
-
-**Example:**
-```csharp
-// ObjectsViewModel fires event
-ObjectAdded?.Invoke(visual, position);
-
-// MainViewModel subscribes
-Objects.ObjectAdded += OnObjectAdded;
+```mermaid
+sequenceDiagram
+    participant OVM as ObjectsViewModel
+    participant MVM as MainViewModel
+    
+    Note over OVM,MVM: Loose coupling via events
+    
+    OVM->>OVM: Creates new object
+    OVM-->>MVM: ObjectAdded?.Invoke(visual, position)
+    MVM->>MVM: OnObjectAdded(visual, position)
+    MVM->>MVM: Create physics body
 ```
+
+**Decision:** ViewModels communicate via events, not direct method calls.
 
 **Benefit:** Loose coupling, ViewModels don't need references to each other.
 
@@ -487,15 +728,46 @@ Objects.ObjectAdded += OnObjectAdded;
 
 ### 4. Transform-Only Visual Updates
 
-**Decision:** Never modify visual geometry properties after creation.
+```mermaid
+flowchart TB
+    subgraph Creation["At Creation Time"]
+        C1[Create Visual3D]
+        C2[Normalize geometry to origin]
+        C3[One-time mesh rebuild]
+    end
+    
+    subgraph Runtime["Every Frame"]
+        R1[Get physics position/rotation]
+        R2[Update Transform property only]
+        R3[No mesh rebuild - fast!]
+    end
+    
+    C1 --> C2 --> C3
+    C3 -.->|"Then..."| R1
+    R1 --> R2 --> R3
+    R3 -->|"Loop"| R1
+```
 
-**Implementation:**
-- At creation: Normalize geometry to origin
-- Every frame: Only update Transform property
+**Decision:** Never modify visual geometry properties after creation.
 
 **Benefit:** 100x+ performance improvement for physics updates.
 
 ### 5. Threaded Physics as Default
+
+```mermaid
+flowchart LR
+    subgraph UIThread["UI Thread"]
+        Render[Rendering]
+        Input[User Input]
+    end
+    
+    subgraph PhysicsThread["Physics Thread"]
+        Sim[Simulation @ 60 FPS]
+        Collision[Collision Detection]
+    end
+    
+    UIThread <-->|"Sync via dispatcher"| PhysicsThread
+```
 
 **Decision:** Use `ThreadedBepuPhysicsEngine` as the default engine.
 
@@ -509,6 +781,29 @@ Objects.ObjectAdded += OnObjectAdded;
 ## Future Extensibility
 
 ### Multiple Renderer Support
+
+```mermaid
+classDiagram
+    class IRenderer {
+        <<interface>>
+    }
+    
+    class HelixWpfRenderer {
+        Current implementation
+    }
+    
+    class SharpDXRenderer {
+        Potential DirectX backend
+    }
+    
+    class NativeWpfRenderer {
+        Potential Viewport3D backend
+    }
+    
+    IRenderer <|.. HelixWpfRenderer
+    IRenderer <|.. SharpDXRenderer
+    IRenderer <|.. NativeWpfRenderer
+```
 
 The `IRenderer` interface allows adding alternative rendering backends:
 
@@ -529,6 +824,23 @@ New object types can be added by:
 3. Adding normalization logic in `PhysicsHelper.NormalizeVisual`
 
 ### Persistence
+
+```mermaid
+flowchart TB
+    subgraph Future["Future Features"]
+        Save[Save/Load Scene]
+        Export["Export to 3D formats<br/>(OBJ, STL)"]
+        Capture["Screenshot/Video<br/>Capture"]
+    end
+    
+    subgraph Current["Current State"]
+        Scene[Scene Objects]
+    end
+    
+    Current --> Save
+    Current --> Export
+    Current --> Capture
+```
 
 Future versions could add:
 - Save/load scene to file
