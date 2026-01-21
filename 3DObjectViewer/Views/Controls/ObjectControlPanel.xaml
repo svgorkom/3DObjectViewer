@@ -1,0 +1,169 @@
+<UserControl x:Class="_3DObjectViewer.Views.Controls.ObjectControlPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:converters="clr-namespace:_3DObjectViewer.Core.Infrastructure.Converters;assembly=3DObjectViewer.Core"
+             mc:Ignorable="d" 
+             d:DesignHeight="900" d:DesignWidth="220">
+    <UserControl.Resources>
+        <converters:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+    </UserControl.Resources>
+    
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="10">
+            <TextBlock Text="3D Object Controls" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+            
+            <!-- Add Objects -->
+            <GroupBox Header="Add Objects" Margin="0,0,0,10">
+                <StackPanel Margin="5">
+                    <!-- Drop Count Control -->
+                    <TextBlock Text="Drop Count:" Margin="0,0,0,3"/>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider Grid.Column="0" 
+                                Minimum="1" Maximum="20" 
+                                Value="{Binding Objects.DropCount}" 
+                                TickFrequency="1" 
+                                IsSnapToTickEnabled="True"
+                                VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" 
+                                   Text="{Binding Objects.DropCount}" 
+                                   Width="25" 
+                                   TextAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   Margin="5,0,0,0"
+                                   FontWeight="SemiBold"/>
+                    </Grid>
+                    
+                    <Button Content="Add Cube(s)" Command="{Binding Objects.AddCubeCommand}" Margin="0,0,0,5"/>
+                    <Button Content="Add Sphere(s)" Command="{Binding Objects.AddSphereCommand}" Margin="0,0,0,5"/>
+                    <Button Content="Add Cylinder(s)" Command="{Binding Objects.AddCylinderCommand}" Margin="0,0,0,5"/>
+                    <Button Content="Add Cone(s)" Command="{Binding Objects.AddConeCommand}" Margin="0,0,0,5"/>
+                    <Button Content="Add Torus(es)" Command="{Binding Objects.AddTorusCommand}" Margin="0,0,0,5"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- New Object Settings -->
+            <GroupBox Header="New Object Settings" Margin="0,0,0,10">
+                <StackPanel Margin="5">
+                    <TextBlock Text="Color:" Margin="0,0,0,3"/>
+                    <StackPanel Margin="0,0,0,5">
+                        <RadioButton Content="Red" GroupName="Colors" 
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Red}" 
+                                     Margin="0,0,0,2"/>
+                        <RadioButton Content="Green" GroupName="Colors" 
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Green}" 
+                                     Margin="0,0,0,2"/>
+                        <RadioButton Content="Blue" GroupName="Colors" 
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Blue}" 
+                                     Margin="0,0,0,2"/>
+                        <RadioButton Content="Yellow" GroupName="Colors" 
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Yellow}" 
+                                     Margin="0,0,0,2"/>
+                        <RadioButton Content="Random" GroupName="Colors" 
+                                     IsChecked="{Binding Objects.SelectedColor, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Random}"/>
+                    </StackPanel>
+                    
+                    <TextBlock Text="Size:"/>
+                    <Slider Minimum="0.5" Maximum="3" Value="{Binding Objects.ObjectSize}" 
+                            TickFrequency="0.5" IsSnapToTickEnabled="True"/>
+                    <TextBlock Text="{Binding Objects.ObjectSize, StringFormat={}{0:F1}}" HorizontalAlignment="Center"/>
+
+                    <TextBlock Text="Drop Height:" Margin="0,5,0,0"/>
+                    <Slider Minimum="2" Maximum="15" Value="{Binding Objects.DropHeight}" 
+                            TickFrequency="1" IsSnapToTickEnabled="True"/>
+                    <TextBlock Text="{Binding Objects.DropHeight, StringFormat={}{0:F0} m}" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Physics Controls -->
+            <GroupBox Header="Physics" Margin="0,0,0,10">
+                <StackPanel Margin="5">
+                    <CheckBox Content="Enable Physics" IsChecked="{Binding PhysicsEnabled}" Margin="0,0,0,5"/>
+                    
+                    <TextBlock Text="Gravity:" Margin="0,5,0,0"/>
+                    <Slider Minimum="1" Maximum="30" Value="{Binding Gravity}" 
+                            TickFrequency="1" SmallChange="0.5"/>
+                    <TextBlock Text="{Binding Gravity, StringFormat={}{0:F1} m/s2}" HorizontalAlignment="Center"/>
+                    
+                    <Button Content="Drop All Objects" Command="{Binding DropAllCommand}" Margin="0,10,0,0"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Selected Object Controls -->
+            <GroupBox Header="Selected Object" Margin="0,0,0,10" 
+                      Visibility="{Binding Selection.HasSelection, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Margin="5">
+                    <Button Content="Apply Color" Command="{Binding Selection.ApplyColorToSelectedCommand}" Margin="0,0,0,5"/>
+                    
+                    <!-- Position Controls -->
+                    <TextBlock Text="Position X:" Margin="0,5,0,0"/>
+                    <Slider Minimum="-10" Maximum="10" Value="{Binding Selection.SelectedObjectPositionX}" 
+                            TickFrequency="0.5" SmallChange="0.1" LargeChange="1"/>
+                    <TextBlock Text="{Binding Selection.SelectedObjectPositionX, StringFormat={}{0:F2}}" HorizontalAlignment="Center"/>
+                    
+                    <TextBlock Text="Position Y:" Margin="0,5,0,0"/>
+                    <Slider Minimum="-10" Maximum="10" Value="{Binding Selection.SelectedObjectPositionY}" 
+                            TickFrequency="0.5" SmallChange="0.1" LargeChange="1"/>
+                    <TextBlock Text="{Binding Selection.SelectedObjectPositionY, StringFormat={}{0:F2}}" HorizontalAlignment="Center"/>
+                    
+                    <TextBlock Text="Position Z:" Margin="0,5,0,0"/>
+                    <Slider Minimum="0" Maximum="15" Value="{Binding Selection.SelectedObjectPositionZ}" 
+                            TickFrequency="0.5" SmallChange="0.1" LargeChange="1"/>
+                    <TextBlock Text="{Binding Selection.SelectedObjectPositionZ, StringFormat={}{0:F2}}" HorizontalAlignment="Center"/>
+                    
+                    <Separator Margin="0,8"/>
+                    
+                    <!-- Scale Control -->
+                    <TextBlock Text="Scale:" Margin="0,5,0,0"/>
+                    <Slider Minimum="0.25" Maximum="3" Value="{Binding Selection.SelectedObjectScale}" 
+                            TickFrequency="0.25" IsSnapToTickEnabled="True"/>
+                    <TextBlock Text="{Binding Selection.SelectedObjectScale, StringFormat={}{0:F2}x}" HorizontalAlignment="Center"/>
+                    
+                    <Separator Margin="0,8"/>
+                    
+                    <!-- Rotation Controls -->
+                    <TextBlock Text="Rotation X:" Margin="0,5,0,0"/>
+                    <Slider Minimum="-180" Maximum="180" Value="{Binding Selection.SelectedObjectRotationX}"/>
+                    <TextBlock Text="{Binding Selection.SelectedObjectRotationX, StringFormat={}{0:F0}}" HorizontalAlignment="Center"/>
+                    
+                    <TextBlock Text="Rotation Y:" Margin="0,5,0,0"/>
+                    <Slider Minimum="-180" Maximum="180" Value="{Binding Selection.SelectedObjectRotationY}"/>
+                    <TextBlock Text="{Binding Selection.SelectedObjectRotationY, StringFormat={}{0:F0}}" HorizontalAlignment="Center"/>
+                    
+                    <TextBlock Text="Rotation Z:" Margin="0,5,0,0"/>
+                    <Slider Minimum="-180" Maximum="180" Value="{Binding Selection.SelectedObjectRotationZ}"/>
+                    <TextBlock Text="{Binding Selection.SelectedObjectRotationZ, StringFormat={}{0:F0}}" HorizontalAlignment="Center"/>
+                    
+                    <Separator Margin="0,8"/>
+                    
+                    <Button Content="Deselect" Command="{Binding Selection.DeselectCommand}" Margin="0,5,0,5"/>
+                    <Button Content="Delete Object" Command="{Binding Selection.DeleteSelectedCommand}" 
+                            Background="#FFDDDD" Margin="0,0,0,5"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Scene Controls -->
+            <GroupBox Header="Scene" Margin="0,0,0,10">
+                <StackPanel Margin="5">
+                    <Button Content="Clear All Objects" Command="{Binding ClearAllCommand}" Margin="0,0,0,5"/>
+                    <Button Content="Reset Camera" Command="{Binding ResetCameraCommand}"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Help Text -->
+            <TextBlock Text="Mouse Controls:" FontWeight="Bold" Margin="0,10,0,5"/>
+            <TextBlock Text="Click object: Select" FontSize="11"/>
+            <TextBlock Text="Ctrl+drag: Move object" FontSize="11"/>
+            <TextBlock Text="Left-drag: Rotate view" FontSize="11"/>
+            <TextBlock Text="Right-drag: Pan view" FontSize="11"/>
+            <TextBlock Text="Scroll: Zoom" FontSize="11"/>
+            <TextBlock Text="Escape: Deselect" FontSize="11"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>_3DObjectViewer</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- HelixToolkit.Wpf targets .NET Framework but works with .NET Core/5+ via compatibility shim -->
+    <PackageReference Include="HelixToolkit.Wpf" Version="2.25.0" NoWarn="NU1701" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\3DObjectViewer.Core\3DObjectViewer.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="3DObjectViewer.Core\Physics\" />
+  </ItemGroup>
+
+</Project>
