@@ -26,6 +26,15 @@ namespace _3DObjectViewer;
 ///   <item><description>Sagittal viewport: Orthographic side view looking along the X-axis</description></item>
 /// </list>
 /// </para>
+/// <para>
+/// Secondary viewports share the same Model3D content as the main viewport to ensure
+/// perfect synchronization of object positions and transforms.
+/// </para>
+/// <para>
+/// <b>Threading:</b> Physics updates are received from the ViewModel already throttled
+/// by the <see cref="Services.SceneUpdateCoordinator"/>. Secondary viewport synchronization
+/// is done lazily on render frames to minimize per-update overhead.
+/// </para>
 /// </remarks>
 public partial class MainWindow : Window
 {
@@ -35,9 +44,10 @@ public partial class MainWindow : Window
     private readonly BoundingBoxVisual3D _selectionBoxSagittal;
     private readonly ModelVisual3D _terrainVisual;
     
-    // Mapping from main viewport objects to their clones in secondary viewports
-    private readonly Dictionary<Visual3D, Visual3D> _topViewClones = [];
-    private readonly Dictionary<Visual3D, Visual3D> _sagittalViewClones = [];
+    // Container for shared scene objects in secondary viewports
+    // These ModelVisual3D instances reference the same Model3D as the original objects
+    private readonly Dictionary<Visual3D, ModelVisual3D> _topViewModels = [];
+    private readonly Dictionary<Visual3D, ModelVisual3D> _sagittalViewModels = [];
     
     private bool _isDragging;
     private Point _lastMousePosition;
@@ -52,7 +62,10 @@ public partial class MainWindow : Window
     private const double StatsUpdateIntervalMs = 250;
     
     private int _cachedTriangleCount;
-    private int _lastObjectCount = 0;
+    private int _lastObjectCount;
+    
+    // Dirty flag for secondary viewport sync - prevents unnecessary sync when no physics updates occurred
+    private bool _secondaryViewportsDirty;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MainWindow"/> class.
@@ -194,166 +207,104 @@ public partial class MainWindow : Window
     #region Secondary Viewport Synchronization
 
     /// <summary>
-    /// Creates a simplified clone of a Visual3D for secondary viewports.
+    /// Extracts the Model3D from a Visual3D.
     /// </summary>
-    /// <remarks>
-    /// The clones are created with geometry centered at the origin, matching how
-    /// the physics system normalizes objects. Position is controlled via Transform.
-    /// </remarks>
-    /// <param name="original">The original visual to clone.</param>
-    /// <returns>A simplified visual that mirrors the original.</returns>
-    private static Visual3D? CreateVisualClone(Visual3D original)
+    private static Model3D? ExtractModel(Visual3D visual)
     {
-        // Create clones with geometry at origin - position is controlled via Transform
-        // This matches how PhysicsHelper normalizes the originals
-        return original switch
+        if (visual is MeshElement3D meshElement)
         {
-            BoxVisual3D box => new BoxVisual3D
-            {
-                Width = box.Width,
-                Height = box.Height,
-                Length = box.Length,
-                Center = new Point3D(0, 0, 0), // Centered at origin
-                Material = box.Material,
-                Transform = box.Transform
-            },
-            SphereVisual3D sphere => new SphereVisual3D
-            {
-                Radius = sphere.Radius,
-                Center = new Point3D(0, 0, 0), // Centered at origin
-                Material = sphere.Material,
-                Transform = sphere.Transform
-            },
-            PipeVisual3D pipe => new PipeVisual3D
-            {
-                Diameter = pipe.Diameter,
-                InnerDiameter = pipe.InnerDiameter,
-                Point1 = pipe.Point1, // Keep relative points (already normalized by physics)
-                Point2 = pipe.Point2,
-                Material = pipe.Material,
-                Transform = pipe.Transform
-            },
-            TruncatedConeVisual3D cone => new TruncatedConeVisual3D
-            {
-                BaseRadius = cone.BaseRadius,
-                TopRadius = cone.TopRadius,
-                Height = cone.Height,
-                Origin = cone.Origin, // Keep relative origin (already normalized by physics)
-                Material = cone.Material,
-                Transform = cone.Transform
-            },
-            TorusVisual3D torus => new TorusVisual3D
-            {
-                TorusDiameter = torus.TorusDiameter,
-                TubeDiameter = torus.TubeDiameter,
-                Material = torus.Material,
-                Transform = torus.Transform
-            },
-            _ => null
-        };
+            return meshElement.Model;
+        }
+        if (visual is ModelVisual3D modelVisual)
+        {
+            return modelVisual.Content;
+        }
+        return null;
     }
 
     /// <summary>
-    /// Updates the transform of cloned visuals to match the original.
+    /// Synchronizes the transforms of secondary viewport models with their originals.
+    /// Only syncs if the dirty flag is set to avoid unnecessary work.
     /// </summary>
-    private void SyncCloneTransforms()
+    private void SyncSecondaryViewportTransforms()
     {
-        foreach (var (original, clone) in _topViewClones)
+        // Early exit if nothing changed
+        if (!_secondaryViewportsDirty)
+            return;
+            
+        _secondaryViewportsDirty = false;
+
+        // Batch updates - iterate once through both dictionaries
+        foreach (var (original, modelVisual) in _topViewModels)
         {
-            SyncVisualState(original, clone);
+            modelVisual.Transform = original.Transform;
         }
         
-        foreach (var (original, clone) in _sagittalViewClones)
+        foreach (var (original, modelVisual) in _sagittalViewModels)
         {
-            SyncVisualState(original, clone);
-        }
-    }
-    
-    /// <summary>
-    /// Synchronizes all relevant state from original to clone.
-    /// </summary>
-    private static void SyncVisualState(Visual3D original, Visual3D clone)
-    {
-        // Always sync the transform
-        clone.Transform = original.Transform;
-        
-        // For some types, also sync geometry properties that might have changed
-        switch (original, clone)
-        {
-            case (BoxVisual3D origBox, BoxVisual3D cloneBox):
-                cloneBox.Center = origBox.Center;
-                break;
-            case (SphereVisual3D origSphere, SphereVisual3D cloneSphere):
-                cloneSphere.Center = origSphere.Center;
-                break;
-            case (PipeVisual3D origPipe, PipeVisual3D clonePipe):
-                clonePipe.Point1 = origPipe.Point1;
-                clonePipe.Point2 = origPipe.Point2;
-                break;
-            case (TruncatedConeVisual3D origCone, TruncatedConeVisual3D cloneCone):
-                cloneCone.Origin = origCone.Origin;
-                break;
+            modelVisual.Transform = original.Transform;
         }
     }
 
     /// <summary>
-    /// Adds a visual to the secondary viewports.
+    /// Adds a visual's model to the secondary viewports.
     /// </summary>
     private void AddToSecondaryViewports(Visual3D visual)
     {
-        var topClone = CreateVisualClone(visual);
-        if (topClone is not null)
-        {
-            // Immediately sync state to ensure clone matches current state
-            SyncVisualState(visual, topClone);
-            _topViewClones[visual] = topClone;
-            TopViewport.Children.Add(topClone);
-        }
+        var model = ExtractModel(visual);
+        if (model is null) return;
         
-        var sagittalClone = CreateVisualClone(visual);
-        if (sagittalClone is not null)
+        var topModelVisual = new ModelVisual3D
         {
-            // Immediately sync state to ensure clone matches current state
-            SyncVisualState(visual, sagittalClone);
-            _sagittalViewClones[visual] = sagittalClone;
-            SagittalViewport.Children.Add(sagittalClone);
-        }
+            Content = model,
+            Transform = visual.Transform
+        };
+        _topViewModels[visual] = topModelVisual;
+        TopViewport.Children.Add(topModelVisual);
+        
+        var sagittalModelVisual = new ModelVisual3D
+        {
+            Content = model,
+            Transform = visual.Transform
+        };
+        _sagittalViewModels[visual] = sagittalModelVisual;
+        SagittalViewport.Children.Add(sagittalModelVisual);
     }
 
     /// <summary>
-    /// Removes a visual from the secondary viewports.
+    /// Removes a visual's model from the secondary viewports.
     /// </summary>
     private void RemoveFromSecondaryViewports(Visual3D visual)
     {
-        if (_topViewClones.TryGetValue(visual, out var topClone))
+        if (_topViewModels.TryGetValue(visual, out var topModel))
         {
-            TopViewport.Children.Remove(topClone);
-            _topViewClones.Remove(visual);
+            TopViewport.Children.Remove(topModel);
+            _topViewModels.Remove(visual);
         }
         
-        if (_sagittalViewClones.TryGetValue(visual, out var sagittalClone))
+        if (_sagittalViewModels.TryGetValue(visual, out var sagittalModel))
         {
-            SagittalViewport.Children.Remove(sagittalClone);
-            _sagittalViewClones.Remove(visual);
+            SagittalViewport.Children.Remove(sagittalModel);
+            _sagittalViewModels.Remove(visual);
         }
     }
 
     /// <summary>
-    /// Clears all clones from secondary viewports.
+    /// Clears all models from secondary viewports.
     /// </summary>
     private void ClearSecondaryViewports()
     {
-        foreach (var clone in _topViewClones.Values)
+        foreach (var model in _topViewModels.Values)
         {
-            TopViewport.Children.Remove(clone);
+            TopViewport.Children.Remove(model);
         }
-        _topViewClones.Clear();
+        _topViewModels.Clear();
         
-        foreach (var clone in _sagittalViewClones.Values)
+        foreach (var model in _sagittalViewModels.Values)
         {
-            SagittalViewport.Children.Remove(clone);
+            SagittalViewport.Children.Remove(model);
         }
-        _sagittalViewClones.Clear();
+        _sagittalViewModels.Clear();
     }
 
     #endregion
@@ -367,7 +318,8 @@ public partial class MainWindow : Window
         _viewModel.SelectionChanged -= OnSelectionChanged;
         _viewModel.PhysicsUpdated -= OnPhysicsUpdated;
         
-        _viewModel.PhysicsEngine.Stop();
+        // Dispose the ViewModel (which disposes the physics engine and coordinator)
+        _viewModel.Dispose();
         _fpsStopwatch.Stop();
     }
 
@@ -378,8 +330,8 @@ public partial class MainWindow : Window
         _frameCount++;
         var elapsed = _fpsStopwatch.Elapsed;
 
-        // Sync clone transforms every frame for smooth secondary viewport updates
-        SyncCloneTransforms();
+        // Sync transforms only if dirty (set by physics update)
+        SyncSecondaryViewportTransforms();
 
         if ((elapsed - _lastFpsUpdate).TotalMilliseconds >= 500)
         {
@@ -599,8 +551,8 @@ public partial class MainWindow : Window
 
     private void OnPhysicsUpdated()
     {
-        // Sync transforms to secondary viewports
-        SyncCloneTransforms();
+        // Mark secondary viewports as dirty - they'll sync on next render frame
+        _secondaryViewportsDirty = true;
         
         if (_viewModel.Selection.HasSelection)
         {

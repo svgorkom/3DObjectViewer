@@ -2,9 +2,9 @@ using System.Collections.ObjectModel;
 using System.Windows.Input;
 using System.Windows.Media.Media3D;
 using _3DObjectViewer.Core.Infrastructure;
-using _3DObjectViewer.Core.Models;
 using _3DObjectViewer.Core.Physics;
 using _3DObjectViewer.Physics;
+using _3DObjectViewer.Services;
 
 namespace _3DObjectViewer.ViewModels;
 
@@ -12,67 +12,72 @@ namespace _3DObjectViewer.ViewModels;
 /// Main ViewModel that orchestrates the 3D Object Viewer application.
 /// </summary>
 /// <remarks>
-/// This ViewModel composes the specialized ViewModels for objects and selection,
+/// <para>
+/// This ViewModel composes specialized child ViewModels for objects, selection, and settings,
 /// providing a unified interface for the main window.
+/// </para>
+/// <para>
+/// Physics updates are coordinated through <see cref="SceneUpdateCoordinator"/> to
+/// prevent UI thread blocking when many objects are moving.
+/// </para>
 /// </remarks>
-public class MainViewModel : ViewModelBase
+public sealed class MainViewModel : ViewModelBase, IDisposable
 {
-    private bool _physicsEnabled = true;
-    private double _gravity = 9.81;
-    private int _physicsUpdateThrottle;
-    private PhysicsEngineType _physicsEngineType = PhysicsEngineType.BepuThreaded;
-    
-    // Mapping from Visual3D to physics body Guid for O(1) lookup
     private readonly Dictionary<Visual3D, Guid> _visualToBodyId = [];
     private readonly Random _random = new();
+    private readonly SceneUpdateCoordinator _updateCoordinator;
+    private readonly ThemeService _themeService;
+    
+    private bool _physicsEnabled = true;
+    private double _gravity = 9.81;
+    private bool _disposed;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="MainViewModel"/> class
-    /// using the default threaded physics engine.
+    /// Initializes a new instance using the default threaded physics engine.
     /// </summary>
     public MainViewModel() : this(PhysicsEngineType.BepuThreaded)
     {
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="MainViewModel"/> class
-    /// with the specified physics engine type.
+    /// Initializes a new instance with the specified physics engine type.
     /// </summary>
-    /// <param name="physicsEngineType">The type of physics engine to use.</param>
     public MainViewModel(PhysicsEngineType physicsEngineType)
     {
-        _physicsEngineType = physicsEngineType;
-        
         SceneObjects = [];
         PhysicsEngine = new PhysicsEngine(physicsEngineType);
+
+        // Create coordinator for throttled UI updates
+        _updateCoordinator = new SceneUpdateCoordinator();
+        _updateCoordinator.BatchedUpdateReady += OnBatchedPhysicsUpdate;
+
+        // Create theme service
+        _themeService = new ThemeService();
+        _themeService.Initialize();
 
         // Create child ViewModels
         Objects = new ObjectsViewModel(SceneObjects);
         Selection = new SelectionViewModel(SceneObjects, Objects);
         PerformanceStats = new PerformanceStatsViewModel();
+        Settings = new SettingsViewModel(_themeService);
 
-        // Scene commands
+        // Commands
         ClearAllCommand = new RelayCommand(ClearAll, () => SceneObjects.Count > 0);
         ResetCameraCommand = new RelayCommand(() => ResetCameraRequested?.Invoke());
         TogglePhysicsCommand = new RelayCommand(TogglePhysics);
         DropAllCommand = new RelayCommand(DropAll, () => SceneObjects.Count > 0);
 
-        // Forward events
+        // Wire up events
         Selection.SelectionChanged += () => SelectionChanged?.Invoke();
         Selection.ObjectDeleted += OnObjectDeleted;
         Selection.ObjectMoved += OnObjectMoved;
-
-        // Subscribe to object additions for physics
         Objects.ObjectAdded += OnObjectAdded;
 
-        // Configure physics engine - use batched updates for better performance
+        // Configure physics
         PhysicsEngine.Gravity = Gravity;
         PhysicsEngine.BodiesUpdated += OnPhysicsBodiesUpdated;
-
-        // Configure bucket bounds (matching grid size: 20x20, height: 4m)
         PhysicsEngine.SetBucketBounds(-10, 10, -10, 10, 4);
 
-        // Start physics
         if (PhysicsEnabled)
         {
             PhysicsEngine.Start();
@@ -81,71 +86,33 @@ public class MainViewModel : ViewModelBase
 
     #region Events
 
-    /// <summary>
-    /// Occurs when a camera reset is requested.
-    /// </summary>
+    /// <summary>Raised when camera reset is requested.</summary>
     public event Action? ResetCameraRequested;
 
-    /// <summary>
-    /// Occurs when the selection visual needs to be updated.
-    /// </summary>
+    /// <summary>Raised when selection visual needs update.</summary>
     public event Action? SelectionChanged;
 
-    /// <summary>
-    /// Occurs when physics updates an object's position.
-    /// </summary>
+    /// <summary>Raised when physics updates object positions (throttled).</summary>
     public event Action? PhysicsUpdated;
 
     #endregion
 
-    #region Child ViewModels and Services
+    #region Child ViewModels
 
-    /// <summary>
-    /// Gets the ViewModel for object creation and settings.
-    /// </summary>
     public ObjectsViewModel Objects { get; }
-
-    /// <summary>
-    /// Gets the ViewModel for selected object manipulation.
-    /// </summary>
     public SelectionViewModel Selection { get; }
-
-    /// <summary>
-    /// Gets the ViewModel for performance statistics display.
-    /// </summary>
     public PerformanceStatsViewModel PerformanceStats { get; }
-
-    /// <summary>
-    /// Gets the physics engine.
-    /// </summary>
+    public SettingsViewModel Settings { get; }
     public PhysicsEngine PhysicsEngine { get; }
 
     #endregion
 
-    #region Shared Collections
+    #region Properties
 
-    /// <summary>
-    /// Gets the collection of 3D objects currently in the scene.
-    /// </summary>
     public ObservableCollection<Visual3D> SceneObjects { get; }
 
-    #endregion
-
-    #region Physics Properties
-
-    /// <summary>
-    /// Gets the current physics engine type.
-    /// </summary>
-    public PhysicsEngineType PhysicsEngineType => _physicsEngineType;
-
-    /// <summary>
-    /// Gets the name of the current physics engine.
-    /// </summary>
     public string PhysicsEngineName => PhysicsEngine.Name;
 
-    /// <summary>
-    /// Gets or sets whether physics simulation is enabled.
-    /// </summary>
     public bool PhysicsEnabled
     {
         get => _physicsEnabled;
@@ -153,17 +120,12 @@ public class MainViewModel : ViewModelBase
         {
             if (SetProperty(ref _physicsEnabled, value))
             {
-                if (value)
-                    PhysicsEngine.Start();
-                else
-                    PhysicsEngine.Stop();
+                if (value) PhysicsEngine.Start();
+                else PhysicsEngine.Stop();
             }
         }
     }
 
-    /// <summary>
-    /// Gets or sets the gravity strength.
-    /// </summary>
     public double Gravity
     {
         get => _gravity;
@@ -176,42 +138,20 @@ public class MainViewModel : ViewModelBase
         }
     }
 
-    #endregion
-
-    #region Convenience Properties (for backward compatibility in bindings)
-
-    /// <summary>
-    /// Gets a value indicating whether an object is currently selected.
-    /// </summary>
     public bool HasSelection => Selection.HasSelection;
 
     #endregion
 
     #region Commands
 
-    /// <summary>
-    /// Gets the command to clear all objects from the scene.
-    /// </summary>
     public ICommand ClearAllCommand { get; }
-
-    /// <summary>
-    /// Gets the command to reset the camera to its default position.
-    /// </summary>
     public ICommand ResetCameraCommand { get; }
-
-    /// <summary>
-    /// Gets the command to toggle physics simulation.
-    /// </summary>
     public ICommand TogglePhysicsCommand { get; }
-
-    /// <summary>
-    /// Gets the command to drop all objects.
-    /// </summary>
     public ICommand DropAllCommand { get; }
 
     #endregion
 
-    #region Methods
+    #region Private Methods
 
     private void ClearAll()
     {
@@ -222,24 +162,18 @@ public class MainViewModel : ViewModelBase
         SceneObjects.Clear();
     }
 
-    private void TogglePhysics()
-    {
-        PhysicsEnabled = !PhysicsEnabled;
-    }
+    private void TogglePhysics() => PhysicsEnabled = !PhysicsEnabled;
 
-    private void DropAll()
-    {
-        PhysicsEngine.WakeAllBodies();
-    }
+    private void DropAll() => PhysicsEngine.WakeAllBodies();
 
     private void OnObjectAdded(Visual3D visual, Point3D position)
     {
         var body = PhysicsHelper.CreateRigidBody(visual, position);
         
-        // Add a small random horizontal velocity to make physics more dynamic
+        // Add random horizontal velocity for visual interest
         body.Velocity = new Vector3D(
-            (_random.NextDouble() - 0.5) * 2.0,  // Random X velocity: -1 to +1
-            (_random.NextDouble() - 0.5) * 2.0,  // Random Y velocity: -1 to +1
+            (_random.NextDouble() - 0.5) * 2.0,
+            (_random.NextDouble() - 0.5) * 2.0,
             0);
         
         PhysicsEngine.AddBody(body);
@@ -248,20 +182,16 @@ public class MainViewModel : ViewModelBase
 
     private void OnPhysicsBodiesUpdated(IReadOnlyList<RigidBody> bodies)
     {
-        // Apply transforms in batch - more efficient than individual events
-        int count = bodies.Count;
-        for (int i = 0; i < count; i++)
+        _updateCoordinator.QueuePhysicsUpdate(bodies);
+    }
+
+    private void OnBatchedPhysicsUpdate(IReadOnlyList<RigidBody> bodies)
+    {
+        for (int i = 0; i < bodies.Count; i++)
         {
             PhysicsHelper.ApplyTransformToVisual(bodies[i]);
         }
-        
-        // Throttle the PhysicsUpdated event to reduce update frequency
-        _physicsUpdateThrottle++;
-        if (_physicsUpdateThrottle >= 2) // Fire every other frame
-        {
-            _physicsUpdateThrottle = 0;
-            PhysicsUpdated?.Invoke();
-        }
+        PhysicsUpdated?.Invoke();
     }
 
     private void OnObjectDeleted(Visual3D visual)
@@ -284,9 +214,30 @@ public class MainViewModel : ViewModelBase
                 body.Position = newPosition;
                 body.Velocity = new Vector3D(0, 0, 0);
                 body.IsAtRest = false;
-                PhysicsEngine.WakeAllBodies(); // Wake the body in case it was sleeping
+                PhysicsEngine.WakeAllBodies();
             }
         }
+    }
+
+    #endregion
+
+    #region IDisposable
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        _updateCoordinator.BatchedUpdateReady -= OnBatchedPhysicsUpdate;
+        _updateCoordinator.Dispose();
+        
+        _themeService.Dispose();
+        
+        PhysicsEngine.BodiesUpdated -= OnPhysicsBodiesUpdated;
+        PhysicsEngine.Stop();
+        PhysicsEngine.Dispose();
+
+        GC.SuppressFinalize(this);
     }
 
     #endregion

@@ -9,12 +9,23 @@
 | Feature | Description |
 |---------|-------------|
 | **Object Creation** | Add 3D primitives (cubes, spheres, cylinders, cones, toruses) with customizable size, color, and material |
-| **Material Styles** | Choose from 6 material types: Shiny, Metallic, Matte, Glass, Glowing, and Neon |
+| **Material Styles** | Choose from 7 material types: Shiny, Metallic, Matte, Glass, Glowing, Neon, and Random |
 | **Color Palette** | 10 preset colors (Red, Green, Blue, Yellow, Orange, Purple, Cyan, Pink, White, Gold) plus Random |
-| **Batch Drop** | Drop multiple objects simultaneously (1-20 at once) |
+| **Batch Drop** | Drop multiple objects simultaneously (1-250 at once, default: 20) |
 | **Physics Simulation** | Objects fall under gravity, collide with each other and boundaries, and come to rest naturally |
 | **Object Manipulation** | Select objects, drag to move them, adjust position/rotation/scale via sliders |
+| **Multi-Viewport** | Three synchronized viewports: Perspective, Top (X-Y), and Side (Y-Z) views |
 | **Performance Monitoring** | Real-time display of FPS, frame time, object count, triangle count, and memory usage |
+| **Theme Support** | Light, Dark, and Follow Windows system theme modes |
+
+### Default Settings
+
+| Setting | Default Value | Range |
+|---------|---------------|-------|
+| Drop Count | 20 | 1-250 |
+| Drop Height | 15 meters | 2-100 meters |
+| Color | Random | 10 colors + Random |
+| Material | Random | 6 materials + Random |
 
 ### Target Framework
 - .NET 10 (Windows)
@@ -23,190 +34,130 @@
 
 ---
 
-## Visual System
-
-### Material Styles
-
-The application supports 6 distinct material styles for objects:
-
-```mermaid
-flowchart LR
-    subgraph Materials["Material Styles"]
-        Shiny["Shiny<br/>(Plastic-like)"]
-        Metallic["Metallic<br/>(Reflective)"]
-        Matte["Matte<br/>(Diffuse only)"]
-        Glass["Glass<br/>(Semi-transparent)"]
-        Glowing["Glowing<br/>(Emissive)"]
-        Neon["Neon<br/>(Bright emission)"]
-    end
-```
-
-| Style | Diffuse | Specular | Emissive | Description |
-|-------|---------|----------|----------|-------------|
-| **Shiny** | Full color | White, power 40 | Subtle (30 alpha) | Standard plastic appearance |
-| **Metallic** | Dark (30%) | Colored, power 100 | Subtle (40 alpha) | Highly reflective metal |
-| **Matte** | Full color | None | Very subtle (15 alpha) | Non-reflective surface |
-| **Glass** | Semi-transparent (120 alpha) | White, power 120 | Subtle (50 alpha) | Translucent with reflections |
-| **Glowing** | Dim (40%) | White, power 20 | Strong (200 alpha) | Self-illuminating appearance |
-| **Neon** | Very dark (20%) | Colored, power 60 | Maximum | Bright glowing effect |
-
-### Color Palette
-
-```mermaid
-flowchart LR
-    subgraph Colors["Available Colors"]
-        Red["Red"]
-        Green["Green"]
-        Blue["Blue"]
-        Yellow["Yellow"]
-        Orange["Orange"]
-        Purple["Purple"]
-        Cyan["Cyan"]
-        Pink["Pink"]
-        White["White"]
-        Gold["Gold"]
-        Random["Random"]
-    end
-```
-
-### Material Caching
-
-Materials are cached for performance:
-
-```mermaid
-flowchart TB
-    subgraph MaterialCreation["Material Creation Flow"]
-        Request[CreateMaterial Request]
-        Check{Is Random Color?}
-        Lookup{In Cache?}
-        Create[Create New Material]
-        Cache[Add to Cache]
-        Return[Return Material]
-    end
-    
-    Request --> Check
-    Check -->|Yes| Create
-    Check -->|No| Lookup
-    Lookup -->|Yes| Return
-    Lookup -->|No| Create
-    Create --> Cache
-    Cache --> Return
-```
-
----
-
 ## Project Structure
 
-```mermaid
-graph TB
-    subgraph "3DObjectViewer/"
-        subgraph "ViewModels/"
-            VM1[MainViewModel.cs]
-            VM2[ObjectsViewModel.cs]
-            VM3[SelectionViewModel.cs]
-            VM5[PerformanceStatsViewModel.cs]
-        end
-        
-        subgraph "Views/Controls/"
-            V1[ObjectControlPanel.xaml]
-        end
-        
-        subgraph "Rendering/"
-            subgraph "HelixWpf/"
-                R1[HelixWpfRenderer.cs]
-                R2[HelixSceneObject.cs]
-                R3[HelixSceneObjects.cs]
-            end
-            R4[RendererManager.cs]
-            R5[RendererFactory.cs]
-        end
-        
-        subgraph "Physics/"
-            P1[PhysicsHelper.cs]
-        end
-        
-        MW[MainWindow.xaml]
-        MWC[MainWindow.xaml.cs]
-        APP[App.xaml]
-    end
+```
+3DObjectViewer/
+??? Resources/
+?   ??? SceneResources.xaml          # Reusable brushes, colors, and styles
+?   ??? LightTheme.xaml              # Light theme resource dictionary
+?   ??? DarkTheme.xaml               # Dark theme resource dictionary
+??? Services/
+?   ??? SceneUpdateCoordinator.cs    # Physics-to-UI update throttling
+?   ??? ThemeService.cs              # Theme management and Windows integration
+??? ViewModels/
+?   ??? MainViewModel.cs             # Root ViewModel, orchestrates app
+?   ??? ObjectsViewModel.cs          # Object creation settings
+?   ??? SelectionViewModel.cs        # Selected object manipulation
+?   ??? SettingsViewModel.cs         # Theme and appearance settings
+?   ??? PerformanceStatsViewModel.cs # Real-time statistics display
+??? Views/Controls/
+?   ??? ObjectControlPanel.xaml      # Left sidebar control panel
+??? Physics/
+?   ??? PhysicsHelper.cs             # Visual3D ? RigidBody bridge
+??? MainWindow.xaml                  # Main window with 3 viewports
+??? MainWindow.xaml.cs               # View code-behind
+??? App.xaml                         # Application entry point
+
+3DObjectViewer.Core/
+??? Models/
+?   ??? ObjectColor.cs               # Color enumeration
+?   ??? MaterialType.cs              # Material style enumeration
+?   ??? ThemeMode.cs                 # AppTheme enumeration
+??? Physics/
+?   ??? ...                          # Physics engine implementations
+??? Infrastructure/
+    ??? ...                          # MVVM base classes
 ```
 
 ---
 
-## Architecture
+## Theme System
 
-### High-Level Architecture
+### Theme Architecture
+
+The application supports three theme modes:
+
+| Mode | Behavior |
+|------|----------|
+| **System** | Follows Windows system theme setting (default) |
+| **Light** | Always uses light theme |
+| **Dark** | Always uses dark theme |
 
 ```mermaid
 flowchart TB
-    subgraph Presentation["PRESENTATION LAYER"]
-        MW[MainWindow<br/>XAML + C#]
-        OCP[ObjectControlPanel<br/>XAML]
+    subgraph ThemeService["ThemeService"]
+        Init[Initialize]
+        Listen[Listen to Windows Events]
+        Apply[Apply Theme]
     end
     
-    subgraph ViewModel["VIEWMODEL LAYER"]
-        MVM[MainViewModel]
-        subgraph ChildVMs["Child ViewModels"]
-            OVM[ObjectsViewModel<br/>• AddCubeCommand<br/>• DropCount<br/>• ObjectSize<br/>• SelectedColor]
-            SVM[SelectionViewModel<br/>• SelectedObject<br/>• Position X/Y/Z<br/>• Scale]
-        end
-        PSVM[PerformanceStatsViewModel<br/>• FPS, FrameTime<br/>• ObjectCount, Triangles<br/>• Memory, Camera]
+    subgraph Resources["Resource Dictionaries"]
+        Light[LightTheme.xaml]
+        Dark[DarkTheme.xaml]
     end
     
-    subgraph Rendering["RENDERING LAYER"]
-        RM[RendererManager]
-        IR[IRenderer]
-        HWR[HelixWpfRenderer]
+    subgraph Registry["Windows Registry"]
+        Personalize[AppsUseLightTheme]
     end
     
-    subgraph Physics["PHYSICS LAYER"]
-        PE[PhysicsEngine<br/>ThreadedBepuPhysics]
-        PH[PhysicsHelper<br/>Visual ? Body bridge]
-    end
-    
-    MW -->|DataContext| MVM
-    OCP -->|Bindings| OVM
-    
-    MVM --> OVM
-    MVM --> SVM
-    MVM --> PSVM
-    
-    MVM --> RM
-    RM --> IR
-    IR --> HWR
-    
-    MVM --> PE
-    MVM --> PH
+    Init --> Listen
+    Listen --> Registry
+    Registry --> Apply
+    Apply --> Light
+    Apply --> Dark
 ```
 
-### MVVM Pattern Implementation
+### Theme Resources
+
+Both themes define consistent resource keys:
+
+| Resource Key | Purpose |
+|--------------|---------|
+| `WindowBackgroundBrush` | Main window background |
+| `PanelBackgroundBrush` | Control panel background |
+| `PrimaryTextBrush` | Main text color |
+| `SecondaryTextBrush` | Dimmed text color |
+| `ButtonBackgroundBrush` | Button backgrounds |
+| `AccentBrush` | Accent color for highlights |
+
+---
+
+## Material System
+
+### Available Materials
+
+| Material | Description | Default |
+|----------|-------------|---------|
+| **Random** | Randomly selected material for each object | ? |
+| **Shiny** | Standard plastic-like with specular highlights | |
+| **Metallic** | Highly reflective metallic surface | |
+| **Matte** | Diffuse surface, no specular | |
+| **Glass** | Semi-transparent with high specular | |
+| **Glowing** | Emissive material that appears to emit light | |
+| **Neon** | Bright glowing effect with color bleeding | |
+
+### Material Creation Flow
 
 ```mermaid
-graph LR
-    subgraph View["View Layer"]
-        V1[MainWindow]
-        V2[Control Panels]
-    end
+flowchart TB
+    Create[CreateMaterial]
+    IsRandom{Random Color<br/>or Material?}
+    GetStyle[GetMaterialStyle]
+    GetColor[GetColorValue]
+    Cache{In Cache?}
+    Build[CreateMaterialForStyle]
+    Return[Return Material]
     
-    subgraph ViewModel["ViewModel Layer"]
-        VM1[MainViewModel]
-        VM2[Child ViewModels]
-    end
-    
-    subgraph Model["Model Layer"]
-        M1[RigidBody]
-    end
-    
-    V1 <-->|Data Binding| VM1
-    V2 <-->|Data Binding| VM2
-    VM1 -->|Reads/Writes| M1
+    Create --> IsRandom
+    IsRandom -->|Yes| GetStyle
+    IsRandom -->|No| Cache
+    GetStyle --> GetColor
+    GetColor --> Build
+    Cache -->|Yes| Return
+    Cache -->|No| Build
+    Build --> Return
 ```
-
-| Layer | Components | Responsibilities |
-|-------|------------|------------------|
-| **View** | MainWindow, Control Panels | UI layout, user input, data binding |
-| **ViewModel** | MainViewModel + child VMs | Business logic, state management, commands |
-| **Model** | RigidBody | Data structures, physics state |
 
 ---
 
@@ -220,615 +171,146 @@ classDiagram
         +ObjectsViewModel Objects
         +SelectionViewModel Selection
         +PerformanceStatsViewModel PerformanceStats
+        +SettingsViewModel Settings
+        +PhysicsEngine PhysicsEngine
+        +ObservableCollection~Visual3D~ SceneObjects
         +bool PhysicsEnabled
         +double Gravity
-        +ObservableCollection~Visual3D~ SceneObjects
-        +ICommand ClearAllCommand
-        +ICommand ResetCameraCommand
-        +ICommand TogglePhysicsCommand
-        +ICommand DropAllCommand
     }
     
     class ObjectsViewModel {
-        +int DropCount
-        +double ObjectSize
-        +ObjectColor SelectedColor
-        +double DropHeight
-        +ICommand AddCubeCommand
-        +ICommand AddSphereCommand
-        +ICommand AddCylinderCommand
-        +ICommand AddConeCommand
-        +ICommand AddTorusCommand
+        +int DropCount = 20
+        +double ObjectSize = 1.0
+        +ObjectColor SelectedColor = Random
+        +MaterialStyle SelectedMaterialStyle = Random
+        +double DropHeight = 15.0
     }
     
-    class SelectionViewModel {
-        +Visual3D SelectedObject
-        +bool HasSelection
-        +double SelectedObjectPositionX
-        +double SelectedObjectPositionY
-        +double SelectedObjectPositionZ
-        +double SelectedObjectScale
-        +double SelectedObjectRotationX
-        +double SelectedObjectRotationY
-        +double SelectedObjectRotationZ
-    }
-    
-    class PerformanceStatsViewModel {
-        +double FPS
-        +double FrameTime
-        +int ObjectCount
-        +int TriangleCount
-        +int PhysicsBodies
-        +long MemoryUsage
-        +string CameraPosition
+    class SettingsViewModel {
+        +AppTheme ThemeMode = System
+        +bool IsSystemTheme
+        +bool IsLightTheme
+        +bool IsDarkTheme
     }
     
     MainViewModel *-- ObjectsViewModel
-    MainViewModel *-- SelectionViewModel
-    MainViewModel *-- PerformanceStatsViewModel
+    MainViewModel *-- SettingsViewModel
+    MainViewModel --> ThemeService
 ```
-
-### MainViewModel
-
-The root ViewModel that orchestrates all child ViewModels and services.
-
-**Responsibilities:**
-- Manages the `SceneObjects` collection shared by all child VMs
-- Owns the `PhysicsEngine` instance
-- Handles physics events and updates visual transforms
-- Coordinates object creation, selection, and deletion
-
-**Key Properties:**
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `Objects` | `ObjectsViewModel` | Object creation settings |
-| `Selection` | `SelectionViewModel` | Selected object manipulation |
-| `PerformanceStats` | `PerformanceStatsViewModel` | Real-time statistics |
-| `PhysicsEnabled` | `bool` | Toggle physics simulation |
-| `Gravity` | `double` | Gravity strength (m/s²) |
-| `SceneObjects` | `ObservableCollection<Visual3D>` | All 3D objects in scene |
-
-**Commands:**
-
-| Command | Action |
-|---------|--------|
-| `ClearAllCommand` | Remove all objects from scene |
-| `ResetCameraCommand` | Reset camera to default position |
-| `TogglePhysicsCommand` | Start/stop physics simulation |
-| `DropAllCommand` | Wake all sleeping objects |
 
 ### ObjectsViewModel
 
 Manages object creation with configurable settings.
 
-**Key Properties:**
+**Default Values (Updated):**
+
+| Property | Default | Range |
+|----------|---------|-------|
+| `DropCount` | 20 | 1-250 |
+| `DropHeight` | 15.0m | 2-100m |
+| `SelectedColor` | Random | 11 options |
+| `SelectedMaterialStyle` | Random | 7 options |
+| `ObjectSize` | 1.0 | 0.5-3.0 |
+
+### SettingsViewModel
+
+Manages application appearance settings.
+
+**Properties:**
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `DropCount` | `int` | Number of objects to drop (1-50) |
-| `ObjectSize` | `double` | Size multiplier (0.5-3.0) |
-| `SelectedColor` | `ObjectColor` | Color for new objects |
-| `DropHeight` | `double` | Height to drop from (2-15m) |
-
-**Commands:**
-
-| Command | Creates |
-|---------|---------|
-| `AddCubeCommand` | BoxVisual3D (N times) |
-| `AddSphereCommand` | SphereVisual3D (N times) |
-| `AddCylinderCommand` | PipeVisual3D (N times) |
-| `AddConeCommand` | TruncatedConeVisual3D (N times) |
-| `AddTorusCommand` | TorusVisual3D (N times) |
-
-### SelectionViewModel
-
-Handles selected object manipulation.
-
-**Key Properties:**
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `SelectedObject` | `Visual3D?` | Currently selected object |
-| `HasSelection` | `bool` | Whether an object is selected |
-| `SelectedObjectPositionX/Y/Z` | `double` | Position sliders |
-| `SelectedObjectScale` | `double` | Scale multiplier |
-| `SelectedObjectRotationX/Y/Z` | `double` | Rotation angles |
-
-**Events:**
-
-| Event | Description |
-|-------|-------------|
-| `SelectionChanged` | Selection changed (update highlight) |
-| `ObjectDeleted` | Object was deleted (cleanup physics) |
-| `ObjectMoved` | Object position changed (sync physics) |
-
-### PerformanceStatsViewModel
-
-Displays real-time performance metrics.
-
-**Displayed Statistics:**
-
-| Statistic | Update Rate | Source |
-|-----------|-------------|--------|
-| FPS | 500ms | Frame timing |
-| Frame Time | 500ms | Frame timing |
-| Object Count | 250ms | SceneObjects.Count |
-| Triangle Count | 250ms | Visual tree traversal |
-| Physics Bodies | 250ms | PhysicsEngine.BodyCount |
-| Memory Usage | 250ms | GC.GetTotalMemory() |
-| Camera Position | 250ms | HelixViewport.Camera |
-
----
-
-## Rendering System
-
-### Rendering Architecture
-
-```mermaid
-flowchart TB
-    subgraph Abstraction["Abstraction Layer"]
-        IR[IRenderer Interface]
-        ISO[ISceneObject Interface]
-    end
-    
-    subgraph Implementation["HelixToolkit.Wpf Implementation"]
-        HWR[HelixWpfRenderer]
-        HSO[HelixSceneObject]
-        HSOs[HelixSceneObjects<br/>Static Factory]
-    end
-    
-    subgraph Visuals["Visual Types"]
-        BV[BoxVisual3D]
-        SV[SphereVisual3D]
-        PV[PipeVisual3D]
-        TCV[TruncatedConeVisual3D]
-        TV[TorusVisual3D]
-    end
-    
-    IR --> HWR
-    ISO --> HSO
-    HWR --> HSOs
-    HSOs --> BV
-    HSOs --> SV
-    HSOs --> PV
-    HSOs --> TCV
-    HSOs --> TV
-```
-
-### HelixToolkit.Wpf Integration
-
-The application uses HelixToolkit.Wpf for 3D rendering, wrapped behind the `IRenderer` interface for potential future extensibility.
-
-**HelixWpfRenderer** implements:
-- Viewport creation and management
-- Primitive creation (box, sphere, cylinder, cone, torus)
-- Hit testing for object selection
-- Camera control
-
-**Supported Visual Types:**
-
-| Visual | HelixToolkit Class | Physics Shape |
-|--------|-------------------|---------------|
-| Box | `BoxVisual3D` | Sphere (bounding) |
-| Sphere | `SphereVisual3D` | Sphere |
-| Cylinder | `PipeVisual3D` | Sphere (bounding) |
-| Cone | `TruncatedConeVisual3D` | Sphere (bounding) |
-| Torus | `TorusVisual3D` | Sphere (bounding) |
-
-### Performance Optimization
-
-**Problem:** HelixToolkit regenerates meshes when visual properties (Center, Origin, Point1/Point2) change.
-
-**Solution:** The `PhysicsHelper` class uses a **normalize-once pattern**:
-
-```mermaid
-flowchart LR
-    subgraph Bad["? EXPENSIVE - Mesh Rebuild"]
-        A1[sphere.Center = newPosition]
-        A2[Triggers full mesh regeneration]
-    end
-    
-    subgraph Good["? CHEAP - Matrix Only"]
-        B1[sphere.Transform = TranslateTransform3D]
-        B2[Just matrix update]
-    end
-    
-    A1 --> A2
-    B1 --> B2
-```
-1. At creation: Move geometry to origin (triggers one mesh rebuild)
-2. Every frame: Only update `Transform` property (cheap matrix operation)
-
----
-
-## Physics Integration
-
-### Physics Architecture
-
-```mermaid
-flowchart TB
-    subgraph Core["3DObjectViewer.Core"]
-        PE[PhysicsEngine]
-        RB[RigidBody]
-        SM[SimdMath<br/>SIMD Optimized]
-    end
-    
-    subgraph App["3DObjectViewer"]
-        PH[PhysicsHelper]
-        V3D[Visual3D Objects]
-    end
-    
-    V3D <-->|Bridge| PH
-    PH <-->|Create/Update| RB
-    RB --> PE
-    PE --> SM
-```
-
-### PhysicsHelper
-
-Bridges the gap between physics bodies and visual objects.
-
-**Responsibilities:**
-1. Create `RigidBody` from `Visual3D` with correct dimensions
-2. Configure physics properties based on object type
-3. Apply physics transforms to visuals efficiently
-
-**Object-Specific Physics Properties:**
-
-| Object Type | Bounciness | Friction | Mass |
-|-------------|------------|----------|------|
-| Sphere | 0.6 | 0.3 | 1.0 |
-| Box | 0.3 | 0.6 | 2.0 |
-| Cylinder | 0.35 | 0.5 | 1.5 |
-| Cone | 0.3 | 0.55 | 1.2 |
-| Torus | 0.5 | 0.4 | 0.8 |
-
-### Data Flow: Object Creation
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant OVM as ObjectsViewModel
-    participant MVM as MainViewModel
-    participant PH as PhysicsHelper
-    participant PE as PhysicsEngine
-    participant UI as UI Thread
-
-    User->>OVM: Click "Add Sphere(s)"
-    
-    loop For each dropCount
-        OVM->>OVM: Calculate random drop position
-        OVM->>OVM: Create SphereVisual3D with material
-        OVM->>OVM: Add to SceneObjects collection
-        OVM->>MVM: Fire ObjectAdded event
-    end
-    
-    MVM->>PH: CreateRigidBody(visual, position)
-    Note over PH: Extract dimensions from visual<br/>Normalize visual (move to origin)<br/>Apply initial transform
-    PH-->>MVM: Return configured RigidBody
-    
-    MVM->>PE: AddBody(body)
-    Note over PE: Queued for physics thread
-    
-    PE->>PE: Process pending operations
-    PE->>PE: Run physics timestep
-    PE->>PE: Collect body states
-    PE->>UI: BeginInvoke(ApplyResults)
-    
-    UI->>MVM: OnPhysicsBodiesUpdated(bodies)
-    
-    loop For each body
-        MVM->>PH: ApplyTransformToVisual(body)
-        Note over PH: Update visual.Transform<br/>with position/rotation
-    end
-```
+| `ThemeMode` | `AppTheme` | Current theme mode (System/Light/Dark) |
+| `IsSystemTheme` | `bool` | Convenience binding for radio button |
+| `IsLightTheme` | `bool` | Convenience binding for radio button |
+| `IsDarkTheme` | `bool` | Convenience binding for radio button |
 
 ---
 
 ## User Interface
 
-### Main Window Layout
-
-```mermaid
-flowchart TB
-    subgraph MainWindow["Main Window"]
-        subgraph Header["Title Bar"]
-            Title[3D Object Viewer]
-            Controls["[-][o][x]"]
-        end
-        
-        subgraph Content["Content Area"]
-            subgraph ControlPanel["Control Panel"]
-                AddObj[Add Objects]
-                Settings[Settings]
-                Physics[Physics]
-                Selected[Selected Object]
-                SceneCtrl[Scene]
-                Help[Help]
-            end
-            
-            subgraph Viewport["3D Viewport (HelixViewport3D)"]
-                Scene[3D Scene]
-                subgraph Stats["Performance Stats"]
-                    FPS[FPS: 60]
-                    Frame[Frame: 16.7ms]
-                    Objects[Objects: 25]
-                    Tris[Tris: 12.5k]
-                end
-            end
-        end
-    end
-```
-
 ### Control Panel Sections
 
-```mermaid
-flowchart TB
-    subgraph CP["Control Panel"]
-        subgraph AddObjects["Add Objects"]
-            DC[Drop Count: 1-20]
-            Buttons["Cube | Sphere | Cylinder | Cone | Torus"]
-        end
-        
-        subgraph Settings["New Object Settings"]
-            Color["Color: Red/Green/Blue/Yellow/Random"]
-            Size["Size: 0.5-3.0"]
-            Height["Drop Height: 2-15m"]
-        end
-        
-        subgraph Physics["Physics"]
-            Enable[Enable Physics ?]
-            Gravity["Gravity: 1-30 m/s²"]
-            DropAll[Drop All Objects]
-        end
-        
-        subgraph Selected["Selected Object (when selected)"]
-            ApplyColor[Apply Color]
-            Position["Position X/Y/Z"]
-            Scale["Scale"]
-            Rotation["Rotation X/Y/Z"]
-            Deselect[Deselect]
-            Delete[Delete Object]
-        end
-        
-        subgraph Scene["Scene"]
-            ClearAll[Clear All Objects]
-            ResetCam[Reset Camera]
-        end
-    end
 ```
-
-### Mouse Controls
-
-```mermaid
-flowchart LR
-    subgraph MouseActions["Mouse Controls"]
-        Click["Left-click on object"] --> Select["Select object"]
-        CtrlDrag["Ctrl + Left-drag"] --> Move["Move selected object"]
-        LeftDrag["Left-drag on background"] --> Rotate["Rotate camera"]
-        RightDrag["Right-drag"] --> Pan["Pan camera"]
-        Scroll["Scroll wheel"] --> Zoom["Zoom in/out"]
-        Escape["Escape key"] --> Deselect["Deselect object"]
-    end
+???????????????????????????
+? 3D Object Controls      ?
+???????????????????????????
+? Add Objects             ?
+? ?? Drop Count: [==20==] ?
+? ?? [Add Cube(s)]        ?
+? ?? [Add Sphere(s)]      ?
+? ?? ...                  ?
+? ?? [Add Random Mix]     ?
+???????????????????????????
+? New Object Settings     ?
+? ?? Color: [swatches]    ?
+? ?   ? Random Color ?    ?
+? ?? Material:            ?
+? ?   ? Random Material ? ?
+? ?   ? Shiny (Plastic)   ?
+? ?   ? Metallic          ?
+? ?   ...                 ?
+? ?? Size: [=1.0=]        ?
+? ?? Drop Height: [=15=]m ?
+???????????????????????????
+? Physics                 ?
+? ?? [?] Enable Physics   ?
+? ?? Gravity: [=9.8=]     ?
+???????????????????????????
+? Appearance              ?
+? ?? Theme:               ?
+? ?   ? Follow Windows ?  ?
+? ?   ? Light             ?
+? ?   ? Dark              ?
+???????????????????????????
+? Selected Object (if any)?
+? ...                     ?
+???????????????????????????
+? Scene                   ?
+? ?? [Clear All] [Reset]  ?
+???????????????????????????
 ```
-
-| Action | Behavior |
-|--------|----------|
-| Left-click on object | Select object |
-| Ctrl + Left-drag | Move selected object |
-| Left-drag on background | Rotate camera |
-| Right-drag | Pan camera |
-| Scroll wheel | Zoom in/out |
-| Escape | Deselect object |
 
 ---
 
 ## Dependencies
 
-```mermaid
-graph TB
-    subgraph App["3DObjectViewer"]
-        WPF[WPF Application]
-    end
-    
-    subgraph Core["3DObjectViewer.Core"]
-        Physics[Physics Engine]
-        Infrastructure[MVVM Infrastructure]
-    end
-    
-    subgraph External["External Packages"]
-        Helix[HelixToolkit.Wpf 2.x]
-        Numerics[System.Numerics]
-    end
-    
-    App --> Core
-    App --> Helix
-    Core --> Numerics
-```
-
 | Package | Version | Purpose |
 |---------|---------|---------|
 | HelixToolkit.Wpf | 2.x | 3D rendering and viewport |
+| BepuPhysics | 2.x | Physics simulation |
 | 3DObjectViewer.Core | local | Physics engine and infrastructure |
 
 ---
 
 ## Design Decisions
 
-### 1. Composition over Inheritance for ViewModels
+### 1. Random as Default
 
-```mermaid
-classDiagram
-    class MainViewModel {
-        +ObjectsViewModel Objects
-        +SelectionViewModel Selection
-    }
-    
-    class ViewModelBase {
-        <<abstract>>
-        +OnPropertyChanged()
-    }
-    
-    ViewModelBase <|-- MainViewModel
-    ViewModelBase <|-- ObjectsViewModel
-    ViewModelBase <|-- SelectionViewModel
-    
-    MainViewModel *-- ObjectsViewModel
-    MainViewModel *-- SelectionViewModel
-```
+**Decision:** Random color and Random material are the default settings.
 
-**Decision:** MainViewModel composes child ViewModels rather than inheriting.
+**Rationale:** Creates visually interesting scenes immediately without user configuration. Each object gets variety automatically.
 
-**Benefit:** Each ViewModel has a single responsibility, easier to test and maintain.
+### 2. Generous Drop Limits
 
-### 2. Event-Based Communication
+**Decision:** Max drop count increased to 250, default to 20.
 
-```mermaid
-sequenceDiagram
-    participant OVM as ObjectsViewModel
-    participant MVM as MainViewModel
-    
-    Note over OVM,MVM: Loose coupling via events
-    
-    OVM->>OVM: Creates new object
-    OVM-->>MVM: ObjectAdded?.Invoke(visual, position)
-    MVM->>MVM: OnObjectAdded(visual, position)
-    MVM->>MVM: Create physics body
-```
+**Rationale:** 
+- Users requested ability to create large scenes quickly
+- Physics engine handles 250+ objects efficiently with threading
+- Default of 20 balances performance and visual impact
 
-**Decision:** ViewModels communicate via events, not direct method calls.
+### 3. AppTheme Naming
 
-**Benefit:** Loose coupling, ViewModels don't need references to each other.
+**Decision:** Use `AppTheme` enum instead of `ThemeMode`.
 
-### 3. Static PhysicsHelper
+**Rationale:** .NET 10 introduced `System.Windows.ThemeMode`, causing naming conflict. `AppTheme` is unambiguous.
 
-**Decision:** PhysicsHelper is a static class with static caches.
+### 4. Follow Windows as Default
 
-**Rationale:**
-- Only one physics-visual bridge per application
-- Simplifies access from multiple ViewModels
-- Caches are cleared when scene is cleared
+**Decision:** Theme defaults to following Windows system setting.
 
-**Tradeoff:** Harder to unit test, but acceptable for this application scope.
-
-### 4. Transform-Only Visual Updates
-
-```mermaid
-flowchart TB
-    subgraph Creation["At Creation Time"]
-        C1[Create Visual3D]
-        C2[Normalize geometry to origin]
-        C3[One-time mesh rebuild]
-    end
-    
-    subgraph Runtime["Every Frame"]
-        R1[Get physics position/rotation]
-        R2[Update Transform property only]
-        R3[No mesh rebuild - fast!]
-    end
-    
-    C1 --> C2 --> C3
-    C3 -.->|"Then..."| R1
-    R1 --> R2 --> R3
-    R3 -->|"Loop"| R1
-```
-
-**Decision:** Never modify visual geometry properties after creation.
-
-**Benefit:** 100x+ performance improvement for physics updates.
-
-### 5. Threaded Physics as Default
-
-```mermaid
-flowchart LR
-    subgraph UIThread["UI Thread"]
-        Render[Rendering]
-        Input[User Input]
-    end
-    
-    subgraph PhysicsThread["Physics Thread"]
-        Sim[Simulation @ 60 FPS]
-        Collision[Collision Detection]
-    end
-    
-    UIThread <-->|"Sync via dispatcher"| PhysicsThread
-```
-
-**Decision:** Use `ThreadedBepuPhysicsEngine` as the default engine.
-
-**Rationale:**
-- Keeps UI responsive even with many objects
-- Physics runs at consistent 60 FPS regardless of rendering load
-- Better user experience for complex scenes
-
----
-
-## Future Extensibility
-
-### Multiple Renderer Support
-
-```mermaid
-classDiagram
-    class IRenderer {
-        <<interface>>
-    }
-    
-    class HelixWpfRenderer {
-        Current implementation
-    }
-    
-    class SharpDXRenderer {
-        Potential DirectX backend
-    }
-    
-    class NativeWpfRenderer {
-        Potential Viewport3D backend
-    }
-    
-    IRenderer <|.. HelixWpfRenderer
-    IRenderer <|.. SharpDXRenderer
-    IRenderer <|.. NativeWpfRenderer
-```
-
-The `IRenderer` interface allows adding alternative rendering backends:
-
-```csharp
-public enum RendererType
-{
-    HelixWpf,      // Current implementation
-    SharpDX,       // Potential DirectX backend
-    NativeWpf      // Potential Viewport3D backend
-}
-```
-
-### Additional Object Types
-
-New object types can be added by:
-1. Adding creation method in `ObjectsViewModel`
-2. Adding dimension extraction in `PhysicsHelper.GetObjectDimensions`
-3. Adding normalization logic in `PhysicsHelper.NormalizeVisual`
-
-### Persistence
-
-```mermaid
-flowchart TB
-    subgraph Future["Future Features"]
-        Save[Save/Load Scene]
-        Export["Export to 3D formats<br/>(OBJ, STL)"]
-        Capture["Screenshot/Video<br/>Capture"]
-    end
-    
-    subgraph Current["Current State"]
-        Scene[Scene Objects]
-    end
-    
-    Current --> Save
-    Current --> Export
-    Current --> Capture
-```
-
-Future versions could add:
-- Save/load scene to file
-- Export to 3D formats (OBJ, STL)
-- Screenshot/video capture
+**Rationale:** 
+- Respects user's system-wide preference
+- No jarring contrast with other Windows apps
+- Users can override if desired

@@ -10,33 +10,11 @@
     
     <!--
     ============================================================================
-    MAIN WINDOW LAYOUT - MULTI-VIEWPORT
+    MAIN WINDOW LAYOUT
     ============================================================================
+    Three synchronized viewports: Perspective (main), Top, and Side views.
     
-    This window provides a 3D object viewing and manipulation environment
-    with three synchronized viewports:
-    
-    LAYOUT STRUCTURE:
-    ┌─────────────┬────────────────────────────────────────────┐
-    │   Left      │                                            │
-    │   Panel     │     Main 3D Viewport (Perspective)         │
-    │   (220px)   │     (2/3 height)                           │
-    │             │                                            │
-    │   Object    ├─────────────────────┬──────────────────────┤
-    │   Controls  │   Top View          │   Sagittal View      │
-    │             │   (1/3 height)      │   (Side View)        │
-    └─────────────┴─────────────────────┴──────────────────────┘
-    
-    VIEWPORTS:
-    - Main (Perspective): Interactive 3D view with camera controls
-    - Top View: Looking down from above (Z-axis, orthographic)
-    - Sagittal View: Looking from the side (X-axis, orthographic)
-    
-    COORDINATE SYSTEM:
-    - X-axis: Red (horizontal, left-right)
-    - Y-axis: Green (horizontal, front-back)  
-    - Z-axis: Blue (vertical, up-down)
-    - Ground plane is at Z=0
+    Coordinate System: X-Right, Y-Forward, Z-Up (right-handed)
     ============================================================================
     -->
     
@@ -46,10 +24,10 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- LEFT CONTROL PANEL -->
+        <!-- Control Panel -->
         <controls:ObjectControlPanel Grid.Column="0" DataContext="{Binding}"/>
 
-        <!-- VIEWPORT AREA -->
+        <!-- Viewports -->
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="2*"/>
@@ -57,14 +35,10 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             
-            <!--
-            ====================================================================
-            MAIN 3D VIEWPORT (PERSPECTIVE VIEW)
-            ====================================================================
-            -->
+            <!-- Main Perspective Viewport -->
             <Grid Grid.Row="0">
                 <h:HelixViewport3D x:Name="HelixViewport"
-                                   Background="#87CEEB"
+                                   Background="{StaticResource SkyBackgroundBrush}"
                                    ShowCoordinateSystem="True"
                                    ZoomExtentsWhenLoaded="True"
                                    MouseDown="HelixViewport_MouseDown"
@@ -78,6 +52,7 @@
                                            FieldOfView="45"/>
                     </h:HelixViewport3D.Camera>
 
+                    <!-- Lighting -->
                     <ModelVisual3D x:Name="AmbientLightVisual">
                         <ModelVisual3D.Content>
                             <AmbientLight Color="#606060"/>
@@ -90,224 +65,150 @@
                         </ModelVisual3D.Content>
                     </ModelVisual3D>
                     
-                    <h:RectangleVisual3D x:Name="GroundPlane" Width="40" Length="40" 
-                                          Origin="0,0,-0.01"
-                                          Normal="0,0,1"
-                                          LengthDirection="1,0,0">
+                    <!-- Ground Plane -->
+                    <h:RectangleVisual3D x:Name="GroundPlane" 
+                                         Width="40" Length="40" 
+                                         Origin="0,0,-0.01" Normal="0,0,1" LengthDirection="1,0,0">
                         <h:RectangleVisual3D.Material>
-                            <MaterialGroup>
-                                <DiffuseMaterial>
-                                    <DiffuseMaterial.Brush>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                            <GradientStop Color="#4A7C2F" Offset="0"/>
-                                            <GradientStop Color="#5D8A3A" Offset="0.3"/>
-                                            <GradientStop Color="#3D6B25" Offset="0.7"/>
-                                            <GradientStop Color="#4A7C2F" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </DiffuseMaterial.Brush>
-                                </DiffuseMaterial>
-                            </MaterialGroup>
-                        </h:RectangleVisual3D.Material>
-                        <h:RectangleVisual3D.BackMaterial>
                             <DiffuseMaterial>
                                 <DiffuseMaterial.Brush>
-                                    <SolidColorBrush Color="#3D2817"/>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="{StaticResource GrassColor1}" Offset="0"/>
+                                        <GradientStop Color="{StaticResource GrassColor2}" Offset="0.3"/>
+                                        <GradientStop Color="{StaticResource GrassColor3}" Offset="0.7"/>
+                                        <GradientStop Color="{StaticResource GrassColor1}" Offset="1"/>
+                                    </LinearGradientBrush>
                                 </DiffuseMaterial.Brush>
                             </DiffuseMaterial>
+                        </h:RectangleVisual3D.Material>
+                        <h:RectangleVisual3D.BackMaterial>
+                            <DiffuseMaterial Brush="{StaticResource WallBrush}"/>
                         </h:RectangleVisual3D.BackMaterial>
                     </h:RectangleVisual3D>
                     
+                    <!-- Grid Lines -->
                     <h:GridLinesVisual3D Width="20" Length="20" 
-                                          MajorDistance="2" 
-                                          MinorDistance="1" 
-                                          Thickness="0.01"
-                                          Center="0,0,0.02"/>
+                                         MajorDistance="2" MinorDistance="1" 
+                                         Thickness="0.01" Center="0,0,0.02"/>
 
-                    <!-- BUCKET/ARENA WALLS -->
-                    <h:RectangleVisual3D Width="20" Length="4" 
-                                          Origin="0,10,2"
-                                          Normal="0,-1,0"
-                                          LengthDirection="0,0,1">
-                        <h:RectangleVisual3D.Material>
-                            <DiffuseMaterial>
-                                <DiffuseMaterial.Brush>
-                                    <SolidColorBrush Color="#40808080"/>
-                                </DiffuseMaterial.Brush>
-                            </DiffuseMaterial>
-                        </h:RectangleVisual3D.Material>
-                        <h:RectangleVisual3D.BackMaterial>
-                            <DiffuseMaterial>
-                                <DiffuseMaterial.Brush>
-                                    <SolidColorBrush Color="#40808080"/>
-                                </DiffuseMaterial.Brush>
-                            </DiffuseMaterial>
-                        </h:RectangleVisual3D.BackMaterial>
+                    <!-- Arena Walls (4 sides) -->
+                    <h:RectangleVisual3D Width="20" Length="4" Origin="0,10,2" Normal="0,-1,0" LengthDirection="0,0,1">
+                        <h:RectangleVisual3D.Material><DiffuseMaterial Brush="{StaticResource WallBrush}"/></h:RectangleVisual3D.Material>
+                        <h:RectangleVisual3D.BackMaterial><DiffuseMaterial Brush="{StaticResource WallBrush}"/></h:RectangleVisual3D.BackMaterial>
                     </h:RectangleVisual3D>
                     
-                    <h:RectangleVisual3D Width="20" Length="4" 
-                                          Origin="0,-10,2"
-                                          Normal="0,1,0"
-                                          LengthDirection="0,0,1">
-                        <h:RectangleVisual3D.Material>
-                            <DiffuseMaterial>
-                                <DiffuseMaterial.Brush>
-                                    <SolidColorBrush Color="#40808080"/>
-                                </DiffuseMaterial.Brush>
-                            </DiffuseMaterial>
-                        </h:RectangleVisual3D.Material>
-                        <h:RectangleVisual3D.BackMaterial>
-                            <DiffuseMaterial>
-                                <DiffuseMaterial.Brush>
-                                    <SolidColorBrush Color="#40808080"/>
-                                </DiffuseMaterial.Brush>
-                            </DiffuseMaterial>
-                        </h:RectangleVisual3D.BackMaterial>
+                    <h:RectangleVisual3D Width="20" Length="4" Origin="0,-10,2" Normal="0,1,0" LengthDirection="0,0,1">
+                        <h:RectangleVisual3D.Material><DiffuseMaterial Brush="{StaticResource WallBrush}"/></h:RectangleVisual3D.Material>
+                        <h:RectangleVisual3D.BackMaterial><DiffuseMaterial Brush="{StaticResource WallBrush}"/></h:RectangleVisual3D.BackMaterial>
                     </h:RectangleVisual3D>
                     
-                    <h:RectangleVisual3D Width="20" Length="4" 
-                                          Origin="10,0,2"
-                                          Normal="-1,0,0"
-                                          LengthDirection="0,0,1">
-                        <h:RectangleVisual3D.Material>
-                            <DiffuseMaterial>
-                                <DiffuseMaterial.Brush>
-                                    <SolidColorBrush Color="#40808080"/>
-                                </DiffuseMaterial.Brush>
-                            </DiffuseMaterial>
-                        </h:RectangleVisual3D.Material>
-                        <h:RectangleVisual3D.BackMaterial>
-                            <DiffuseMaterial>
-                                <DiffuseMaterial.Brush>
-                                    <SolidColorBrush Color="#40808080"/>
-                                </DiffuseMaterial.Brush>
-                            </DiffuseMaterial>
-                        </h:RectangleVisual3D.BackMaterial>
+                    <h:RectangleVisual3D Width="20" Length="4" Origin="10,0,2" Normal="-1,0,0" LengthDirection="0,0,1">
+                        <h:RectangleVisual3D.Material><DiffuseMaterial Brush="{StaticResource WallBrush}"/></h:RectangleVisual3D.Material>
+                        <h:RectangleVisual3D.BackMaterial><DiffuseMaterial Brush="{StaticResource WallBrush}"/></h:RectangleVisual3D.BackMaterial>
                     </h:RectangleVisual3D>
                     
-                    <h:RectangleVisual3D Width="20" Length="4" 
-                                          Origin="-10,0,2"
-                                          Normal="1,0,0"
-                                          LengthDirection="0,0,1">
-                        <h:RectangleVisual3D.Material>
-                            <DiffuseMaterial>
-                                <DiffuseMaterial.Brush>
-                                    <SolidColorBrush Color="#40808080"/>
-                                </DiffuseMaterial.Brush>
-                            </DiffuseMaterial>
-                        </h:RectangleVisual3D.Material>
-                        <h:RectangleVisual3D.BackMaterial>
-                            <DiffuseMaterial>
-                                <DiffuseMaterial.Brush>
-                                    <SolidColorBrush Color="#40808080"/>
-                                </DiffuseMaterial.Brush>
-                            </DiffuseMaterial>
-                        </h:RectangleVisual3D.BackMaterial>
+                    <h:RectangleVisual3D Width="20" Length="4" Origin="-10,0,2" Normal="1,0,0" LengthDirection="0,0,1">
+                        <h:RectangleVisual3D.Material><DiffuseMaterial Brush="{StaticResource WallBrush}"/></h:RectangleVisual3D.Material>
+                        <h:RectangleVisual3D.BackMaterial><DiffuseMaterial Brush="{StaticResource WallBrush}"/></h:RectangleVisual3D.BackMaterial>
                     </h:RectangleVisual3D>
 
                 </h:HelixViewport3D>
 
-                <!-- PERFORMANCE STATS OVERLAY -->
-                <Border Background="#80000000" 
-                        CornerRadius="4" 
-                        Padding="8"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Top"
-                        Margin="10"
+                <!-- Performance Stats Overlay -->
+                <Border Style="{StaticResource StatsOverlayBorderStyle}"
                         DataContext="{Binding PerformanceStats}">
                     <StackPanel>
+                        <!-- FPS -->
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="FPS: " Foreground="#80FFFFFF" FontSize="14" FontWeight="Bold"/>
-                            <TextBlock Text="{Binding FpsText}" Foreground="#00FF00" FontSize="14" FontWeight="Bold"/>
+                            <TextBlock Text="FPS: " Foreground="{StaticResource OverlayTextDimBrush}" FontSize="14" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding FpsText}" Foreground="{StaticResource FpsGreenBrush}" FontSize="14" FontWeight="Bold"/>
                         </StackPanel>
                         
+                        <!-- FPS Graph -->
                         <Grid Width="150" Height="40" Margin="0,5,0,0">
                             <Canvas>
-                                <Line X1="0" Y1="0" X2="150" Y2="0" Stroke="#40FFFFFF" StrokeThickness="0.5"/>
-                                <Line X1="0" Y1="20" X2="150" Y2="20" Stroke="#40FFFFFF" StrokeThickness="0.5"/>
-                                <Line X1="0" Y1="40" X2="150" Y2="40" Stroke="#40FFFFFF" StrokeThickness="0.5"/>
+                                <Line X1="0" Y1="0" X2="150" Y2="0" Stroke="{StaticResource GridLineHintBrush}" StrokeThickness="0.5"/>
+                                <Line X1="0" Y1="20" X2="150" Y2="20" Stroke="{StaticResource GridLineHintBrush}" StrokeThickness="0.5"/>
+                                <Line X1="0" Y1="40" X2="150" Y2="40" Stroke="{StaticResource GridLineHintBrush}" StrokeThickness="0.5"/>
                             </Canvas>
                             <Canvas ClipToBounds="True">
-                                <Polyline Points="{Binding FpsGraphPoints}"
-                                          Stroke="#00FF00"
-                                          StrokeThickness="1.5"
-                                          StrokeLineJoin="Round"/>
+                                <Polyline Points="{Binding FpsGraphPoints}" Stroke="{StaticResource FpsGreenBrush}" 
+                                          StrokeThickness="1.5" StrokeLineJoin="Round"/>
                             </Canvas>
-                            <TextBlock Text="120" Foreground="#80FFFFFF" FontSize="8" 
+                            <TextBlock Text="120" Style="{StaticResource AxisLabelStyle}" FontSize="8" 
                                        HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                            <TextBlock Text="0" Foreground="#80FFFFFF" FontSize="8" 
+                            <TextBlock Text="0" Style="{StaticResource AxisLabelStyle}" FontSize="8" 
                                        HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
                         </Grid>
                         
-                        <Rectangle Height="1" Fill="#40FFFFFF" Margin="0,8,0,6"/>
+                        <Rectangle Style="{StaticResource StatsSeparatorStyle}" Margin="0,8,0,6"/>
                         
+                        <!-- Stats -->
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Frame Time: " Foreground="#80FFFFFF" FontSize="11"/>
-                            <TextBlock Text="{Binding FrameTimeText}" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                            <TextBlock Text="Frame Time: " Style="{StaticResource StatsLabelStyle}"/>
+                            <TextBlock Text="{Binding FrameTimeText}" Style="{StaticResource StatsValueStyle}"/>
                         </StackPanel>
                         
                         <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                            <TextBlock Text="Objects: " Foreground="#80FFFFFF" FontSize="11"/>
-                            <TextBlock Text="{Binding ObjectCountText}" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                            <TextBlock Text="Objects: " Style="{StaticResource StatsLabelStyle}"/>
+                            <TextBlock Text="{Binding ObjectCountText}" Style="{StaticResource StatsValueStyle}"/>
                         </StackPanel>
                         
                         <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                            <TextBlock Text="Triangles: " Foreground="#80FFFFFF" FontSize="11"/>
-                            <TextBlock Text="{Binding TriangleCountText}" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                            <TextBlock Text="Triangles: " Style="{StaticResource StatsLabelStyle}"/>
+                            <TextBlock Text="{Binding TriangleCountText}" Style="{StaticResource StatsValueStyle}"/>
                         </StackPanel>
                         
                         <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                            <TextBlock Text="Physics Bodies: " Foreground="#80FFFFFF" FontSize="11"/>
-                            <TextBlock Text="{Binding PhysicsBodiesText}" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                            <TextBlock Text="Physics Bodies: " Style="{StaticResource StatsLabelStyle}"/>
+                            <TextBlock Text="{Binding PhysicsBodiesText}" Style="{StaticResource StatsValueStyle}"/>
                         </StackPanel>
                         
-                        <Rectangle Height="1" Fill="#40FFFFFF" Margin="0,6,0,6"/>
+                        <Rectangle Style="{StaticResource StatsSeparatorStyle}"/>
                         
+                        <!-- Memory -->
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Memory: " Foreground="#80FFFFFF" FontSize="11"/>
-                            <TextBlock Text="{Binding MemoryUsageText}" Foreground="#FF9900" FontSize="11" FontWeight="SemiBold"/>
+                            <TextBlock Text="Memory: " Style="{StaticResource StatsLabelStyle}"/>
+                            <TextBlock Text="{Binding MemoryUsageText}" Foreground="{StaticResource MemoryOrangeBrush}" 
+                                       FontSize="11" FontWeight="SemiBold"/>
                         </StackPanel>
                         
+                        <!-- Memory Graph -->
                         <Grid Width="150" Height="40" Margin="0,5,0,0">
                             <Canvas>
-                                <Line X1="0" Y1="0" X2="150" Y2="0" Stroke="#40FFFFFF" StrokeThickness="0.5"/>
-                                <Line X1="0" Y1="20" X2="150" Y2="20" Stroke="#40FFFFFF" StrokeThickness="0.5"/>
-                                <Line X1="0" Y1="40" X2="150" Y2="40" Stroke="#40FFFFFF" StrokeThickness="0.5"/>
+                                <Line X1="0" Y1="0" X2="150" Y2="0" Stroke="{StaticResource GridLineHintBrush}" StrokeThickness="0.5"/>
+                                <Line X1="0" Y1="20" X2="150" Y2="20" Stroke="{StaticResource GridLineHintBrush}" StrokeThickness="0.5"/>
+                                <Line X1="0" Y1="40" X2="150" Y2="40" Stroke="{StaticResource GridLineHintBrush}" StrokeThickness="0.5"/>
                             </Canvas>
                             <Canvas ClipToBounds="True">
-                                <Polyline Points="{Binding MemoryGraphPoints}"
-                                          Stroke="#FF9900"
-                                          StrokeThickness="1.5"
-                                          StrokeLineJoin="Round"/>
+                                <Polyline Points="{Binding MemoryGraphPoints}" Stroke="{StaticResource MemoryOrangeBrush}" 
+                                          StrokeThickness="1.5" StrokeLineJoin="Round"/>
                             </Canvas>
-                            <TextBlock Text="500" Foreground="#80FFFFFF" FontSize="8" 
+                            <TextBlock Text="500" Style="{StaticResource AxisLabelStyle}" FontSize="8" 
                                        HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                            <TextBlock Text="0" Foreground="#80FFFFFF" FontSize="8" 
+                            <TextBlock Text="0" Style="{StaticResource AxisLabelStyle}" FontSize="8" 
                                        HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
                         </Grid>
                         
-                        <Rectangle Height="1" Fill="#40FFFFFF" Margin="0,6,0,6"/>
+                        <Rectangle Style="{StaticResource StatsSeparatorStyle}"/>
                         
-                        <TextBlock Text="Camera Position" Foreground="#80FFFFFF" FontSize="10"/>
+                        <!-- Camera -->
+                        <TextBlock Text="Camera Position" Style="{StaticResource StatsLabelStyle}" FontSize="10"/>
                         <TextBlock Text="{Binding CameraPositionText}" Foreground="White" FontSize="10" Margin="0,2,0,0"/>
                     </StackPanel>
                 </Border>
                 
                 <!-- View Label -->
-                <Border Background="#80000000" CornerRadius="3" Padding="6,3" 
+                <Border Style="{StaticResource ViewLabelBorderStyle}" 
                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10">
-                    <TextBlock Text="PERSPECTIVE" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                    <TextBlock Text="PERSPECTIVE" Style="{StaticResource ViewLabelTextStyle}" FontSize="11"/>
                 </Border>
             </Grid>
             
-            <!-- Splitter -->
-            <GridSplitter Grid.Row="1" Height="3" HorizontalAlignment="Stretch" 
-                          Background="#404040" ResizeDirection="Rows"/>
+            <!-- Horizontal Splitter -->
+            <GridSplitter Grid.Row="1" Height="3" Style="{StaticResource ViewportSplitterStyle}" ResizeDirection="Rows"/>
             
-            <!--
-            ====================================================================
-            SECONDARY VIEWPORTS (TOP VIEW & SAGITTAL VIEW)
-            ====================================================================
-            -->
+            <!-- Secondary Viewports -->
             <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -315,221 +216,116 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 
-                <!--
-                ================================================================
-                TOP VIEW (Looking down Z-axis, Orthographic)
-                ================================================================
-                Camera: Position above, looking down toward origin
-                Shows X-Y plane (bird's eye view)
-                - X axis: horizontal (left-right in this view)
-                - Y axis: vertical (up-down in this view)
-                ================================================================
-                -->
+                <!-- Top View (X-Y Plane) -->
                 <Grid Grid.Column="0">
                     <h:HelixViewport3D x:Name="TopViewport"
-                                       Background="#2D4A3E"
+                                       Background="{StaticResource TopViewBackgroundBrush}"
                                        ShowCoordinateSystem="True"
-                                       IsRotationEnabled="False"
-                                       IsPanEnabled="True"
-                                       IsZoomEnabled="True"
+                                       IsRotationEnabled="False" IsPanEnabled="True" IsZoomEnabled="True"
                                        ZoomExtentsWhenLoaded="False">
                         
                         <h:HelixViewport3D.Camera>
-                            <!-- Camera positioned on +Z axis, looking down toward -Z -->
-                            <OrthographicCamera Position="0,0,30" 
-                                               LookDirection="0,0,-1" 
-                                               UpDirection="0,1,0"
-                                               Width="25"/>
+                            <OrthographicCamera Position="0,0,50" LookDirection="0,0,-1" UpDirection="0,1,0" Width="25"/>
                         </h:HelixViewport3D.Camera>
 
                         <ModelVisual3D>
-                            <ModelVisual3D.Content>
-                                <AmbientLight Color="#808080"/>
-                            </ModelVisual3D.Content>
+                            <ModelVisual3D.Content><AmbientLight Color="#808080"/></ModelVisual3D.Content>
                         </ModelVisual3D>
-                        
                         <ModelVisual3D>
-                            <ModelVisual3D.Content>
-                                <DirectionalLight Color="#FFFFFF" Direction="0,0,-1"/>
-                            </ModelVisual3D.Content>
+                            <ModelVisual3D.Content><DirectionalLight Color="#FFFFFF" Direction="0,0,-1"/></ModelVisual3D.Content>
                         </ModelVisual3D>
                         
-                        <!-- Ground plane indicator -->
-                        <h:RectangleVisual3D Width="20" Length="20" 
-                                              Origin="0,0,-0.01"
-                                              Normal="0,0,1"
-                                              LengthDirection="1,0,0">
+                        <!-- Ground indicator -->
+                        <h:RectangleVisual3D Width="20" Length="20" Origin="0,0,-0.01" Normal="0,0,1" LengthDirection="1,0,0">
                             <h:RectangleVisual3D.Material>
-                                <DiffuseMaterial>
-                                    <DiffuseMaterial.Brush>
-                                        <SolidColorBrush Color="#30FFFFFF"/>
-                                    </DiffuseMaterial.Brush>
-                                </DiffuseMaterial>
+                                <DiffuseMaterial Brush="{StaticResource GridLineBrush}"/>
                             </h:RectangleVisual3D.Material>
                         </h:RectangleVisual3D>
                         
-                        <!-- Grid lines on X-Y plane -->
-                        <h:GridLinesVisual3D Width="20" Length="20" 
-                                              MajorDistance="5" 
-                                              MinorDistance="1" 
-                                              Thickness="0.02"
-                                              Center="0,0,0.01"/>
+                        <h:GridLinesVisual3D Width="20" Length="20" MajorDistance="5" MinorDistance="1" 
+                                             Thickness="0.02" Center="0,0,0.01"/>
                         
                         <!-- Arena boundary -->
-                        <h:LinesVisual3D Color="#60FFFFFF" Thickness="2">
+                        <h:LinesVisual3D Color="#80FFFFFF" Thickness="3">
                             <h:LinesVisual3D.Points>
                                 <Point3DCollection>
-                                    <!-- Arena boundary box at Z=0.1 -->
-                                    <Point3D X="-10" Y="-10" Z="0.1"/>
-                                    <Point3D X="10" Y="-10" Z="0.1"/>
-                                    <Point3D X="10" Y="-10" Z="0.1"/>
-                                    <Point3D X="10" Y="10" Z="0.1"/>
-                                    <Point3D X="10" Y="10" Z="0.1"/>
-                                    <Point3D X="-10" Y="10" Z="0.1"/>
-                                    <Point3D X="-10" Y="10" Z="0.1"/>
-                                    <Point3D X="-10" Y="-10" Z="0.1"/>
+                                    -10,-10,0.1  10,-10,0.1  10,-10,0.1  10,10,0.1
+                                    10,10,0.1  -10,10,0.1  -10,10,0.1  -10,-10,0.1
                                 </Point3DCollection>
                             </h:LinesVisual3D.Points>
                         </h:LinesVisual3D>
                     </h:HelixViewport3D>
                     
-                    <!-- View Label -->
-                    <Border Background="#80000000" CornerRadius="3" Padding="6,3" 
-                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="5">
-                        <TextBlock Text="TOP VIEW (X-Y)" Foreground="White" FontSize="10" FontWeight="SemiBold"/>
+                    <Border Style="{StaticResource ViewLabelBorderStyle}">
+                        <TextBlock Text="TOP VIEW (X-Y)" Style="{StaticResource ViewLabelTextStyle}"/>
                     </Border>
                     
-                    <!-- Axis labels -->
-                    <TextBlock Text="X →" Foreground="#80FFFFFF" FontSize="9" 
+                    <TextBlock Text="X →" Style="{StaticResource AxisLabelStyle}" 
                                HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,5"/>
-                    <TextBlock Text="↑ Y" Foreground="#80FFFFFF" FontSize="9" 
+                    <TextBlock Text="↑ Y" Style="{StaticResource AxisLabelStyle}" 
                                HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
-                        <TextBlock.LayoutTransform>
-                            <RotateTransform Angle="-90"/>
-                        </TextBlock.LayoutTransform>
+                        <TextBlock.LayoutTransform><RotateTransform Angle="-90"/></TextBlock.LayoutTransform>
                     </TextBlock>
                 </Grid>
                 
-                <!-- Splitter -->
-                <GridSplitter Grid.Column="1" Width="3" HorizontalAlignment="Stretch" 
-                              Background="#404040" ResizeDirection="Columns"/>
+                <!-- Vertical Splitter -->
+                <GridSplitter Grid.Column="1" Width="3" Style="{StaticResource ViewportSplitterStyle}" ResizeDirection="Columns"/>
                 
-                <!--
-                ================================================================
-                SAGITTAL VIEW (Looking along X-axis, Orthographic)
-                ================================================================
-                Camera: Position to the right, looking left toward origin
-                Shows Y-Z plane (side view)
-                - Y axis: horizontal (left-right in this view)
-                - Z axis: vertical (up-down in this view)
-                ================================================================
-                -->
+                <!-- Side View (Y-Z Plane) -->
                 <Grid Grid.Column="2">
                     <h:HelixViewport3D x:Name="SagittalViewport"
-                                       Background="#3D2D4A"
+                                       Background="{StaticResource SideViewBackgroundBrush}"
                                        ShowCoordinateSystem="True"
-                                       IsRotationEnabled="False"
-                                       IsPanEnabled="True"
-                                       IsZoomEnabled="True"
+                                       IsRotationEnabled="False" IsPanEnabled="True" IsZoomEnabled="True"
                                        ZoomExtentsWhenLoaded="False">
                         
                         <h:HelixViewport3D.Camera>
-                            <!-- Camera positioned on +X axis, looking toward -X (toward origin) -->
-                            <!-- Centered at Z=5 to show objects from ground (Z=0) up to ~10 -->
-                            <OrthographicCamera Position="30,0,5" 
-                                               LookDirection="-1,0,0" 
-                                               UpDirection="0,0,1"
-                                               Width="25"/>
+                            <OrthographicCamera Position="30,0,2" LookDirection="-1,0,0" UpDirection="0,0,1" Width="25"/>
                         </h:HelixViewport3D.Camera>
 
                         <ModelVisual3D>
-                            <ModelVisual3D.Content>
-                                <AmbientLight Color="#808080"/>
-                            </ModelVisual3D.Content>
+                            <ModelVisual3D.Content><AmbientLight Color="#808080"/></ModelVisual3D.Content>
                         </ModelVisual3D>
-                        
                         <ModelVisual3D>
-                            <ModelVisual3D.Content>
-                                <DirectionalLight Color="#FFFFFF" Direction="-1,0,-0.5"/>
-                            </ModelVisual3D.Content>
+                            <ModelVisual3D.Content><DirectionalLight Color="#FFFFFF" Direction="-1,0,-0.5"/></ModelVisual3D.Content>
                         </ModelVisual3D>
                         
-                        <!-- Ground plane shown as a line at Z=0 -->
-                        <h:LinesVisual3D Color="#60FFFFFF" Thickness="3">
+                        <!-- Ground line -->
+                        <h:LinesVisual3D Color="#80FFFFFF" Thickness="4">
                             <h:LinesVisual3D.Points>
-                                <Point3DCollection>
-                                    <Point3D X="0" Y="-15" Z="0"/>
-                                    <Point3D X="0" Y="15" Z="0"/>
-                                </Point3DCollection>
+                                <Point3DCollection>0,-15,0  0,15,0</Point3DCollection>
                             </h:LinesVisual3D.Points>
                         </h:LinesVisual3D>
                         
-                        <!-- Arena boundary lines at Y = -10 and Y = +10 -->
+                        <!-- Arena boundaries -->
                         <h:LinesVisual3D Color="#40FFFFFF" Thickness="1">
                             <h:LinesVisual3D.Points>
                                 <Point3DCollection>
-                                    <!-- Left boundary (Y = -10) -->
-                                    <Point3D X="0" Y="-10" Z="0"/>
-                                    <Point3D X="0" Y="-10" Z="10"/>
-                                    <!-- Right boundary (Y = +10) -->
-                                    <Point3D X="0" Y="10" Z="0"/>
-                                    <Point3D X="0" Y="10" Z="10"/>
+                                    0,-10,0  0,-10,6  0,10,0  0,10,6
                                 </Point3DCollection>
                             </h:LinesVisual3D.Points>
                         </h:LinesVisual3D>
                         
-                        <!-- Horizontal grid lines (Z levels) -->
+                        <!-- Grid lines -->
                         <h:LinesVisual3D Color="#30FFFFFF" Thickness="0.5">
                             <h:LinesVisual3D.Points>
                                 <Point3DCollection>
-                                    <!-- Z = 2 -->
-                                    <Point3D X="0" Y="-12" Z="2"/>
-                                    <Point3D X="0" Y="12" Z="2"/>
-                                    <!-- Z = 4 -->
-                                    <Point3D X="0" Y="-12" Z="4"/>
-                                    <Point3D X="0" Y="12" Z="4"/>
-                                    <!-- Z = 6 -->
-                                    <Point3D X="0" Y="-12" Z="6"/>
-                                    <Point3D X="0" Y="12" Z="6"/>
-                                    <!-- Z = 8 -->
-                                    <Point3D X="0" Y="-12" Z="8"/>
-                                    <Point3D X="0" Y="12" Z="8"/>
-                                </Point3DCollection>
-                            </h:LinesVisual3D.Points>
-                        </h:LinesVisual3D>
-                        
-                        <!-- Vertical grid lines (Y positions) -->
-                        <h:LinesVisual3D Color="#30FFFFFF" Thickness="0.5">
-                            <h:LinesVisual3D.Points>
-                                <Point3DCollection>
-                                    <!-- Y = -5 -->
-                                    <Point3D X="0" Y="-5" Z="0"/>
-                                    <Point3D X="0" Y="-5" Z="10"/>
-                                    <!-- Y = 0 (center) -->
-                                    <Point3D X="0" Y="0" Z="0"/>
-                                    <Point3D X="0" Y="0" Z="10"/>
-                                    <!-- Y = 5 -->
-                                    <Point3D X="0" Y="5" Z="0"/>
-                                    <Point3D X="0" Y="5" Z="10"/>
+                                    0,-12,1  0,12,1  0,-12,2  0,12,2  0,-12,3  0,12,3  0,-12,4  0,12,4
+                                    0,-5,0  0,-5,5  0,0,0  0,0,5  0,5,0  0,5,5
                                 </Point3DCollection>
                             </h:LinesVisual3D.Points>
                         </h:LinesVisual3D>
                     </h:HelixViewport3D>
                     
-                    <!-- View Label -->
-                    <Border Background="#80000000" CornerRadius="3" Padding="6,3" 
-                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="5">
-                        <TextBlock Text="SIDE VIEW (Y-Z)" Foreground="White" FontSize="10" FontWeight="SemiBold"/>
+                    <Border Style="{StaticResource ViewLabelBorderStyle}">
+                        <TextBlock Text="SIDE VIEW (Y-Z)" Style="{StaticResource ViewLabelTextStyle}"/>
                     </Border>
                     
-                    <!-- Axis labels -->
-                    <TextBlock Text="Y →" Foreground="#80FFFFFF" FontSize="9" 
+                    <TextBlock Text="Y →" Style="{StaticResource AxisLabelStyle}" 
                                HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,5"/>
-                    <TextBlock Text="↑ Z" Foreground="#80FFFFFF" FontSize="9" 
+                    <TextBlock Text="↑ Z" Style="{StaticResource AxisLabelStyle}" 
                                HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
-                        <TextBlock.LayoutTransform>
-                            <RotateTransform Angle="-90"/>
-                        </TextBlock.LayoutTransform>
+                        <TextBlock.LayoutTransform><RotateTransform Angle="-90"/></TextBlock.LayoutTransform>
                     </TextBlock>
                 </Grid>
             </Grid>

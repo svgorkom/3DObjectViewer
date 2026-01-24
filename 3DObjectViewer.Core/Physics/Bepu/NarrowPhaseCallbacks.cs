@@ -42,8 +42,8 @@ internal struct NarrowPhaseCallbacks : INarrowPhaseCallbacks
     public static NarrowPhaseCallbacks CreateDefault() => new()
     {
         FrictionCoefficient = 0.6f,
-        MaximumRecoveryVelocity = 10f,
-        SpringFrequency = 120f,
+        MaximumRecoveryVelocity = 2f,
+        SpringFrequency = 30f,
         SpringDampingRatio = 1f
     };
 

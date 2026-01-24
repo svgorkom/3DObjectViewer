@@ -62,14 +62,15 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <Slider Grid.Column="0" 
-                                Minimum="1" Maximum="20" 
+                                Minimum="1" Maximum="250" 
                                 Value="{Binding Objects.DropCount}" 
-                                TickFrequency="1" 
-                                IsSnapToTickEnabled="True"
+                                TickFrequency="10" 
+                                SmallChange="1"
+                                LargeChange="10"
                                 VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="1" 
                                    Text="{Binding Objects.DropCount}" 
-                                   Width="25" 
+                                   Width="30" 
                                    TextAlignment="Right"
                                    VerticalAlignment="Center"
                                    Margin="5,0,0,0"
@@ -84,14 +85,12 @@
                     
                     <Separator Margin="0,5"/>
                     
-                    <!-- Random Objects Button - stands out with different styling -->
+                    <!-- Random Objects Button -->
                     <Button Command="{Binding Objects.AddRandomCommand}" 
                             Margin="0,0,0,5"
-                            Background="#E8F5E9"
+                            Style="{DynamicResource SuccessButton}"
                             FontWeight="SemiBold">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Add Random Mix" VerticalAlignment="Center"/>
-                        </StackPanel>
+                        <TextBlock Text="Add Random Mix" VerticalAlignment="Center"/>
                     </Button>
                 </StackPanel>
             </GroupBox>
@@ -152,6 +151,10 @@
                     <!-- Material Type Selection -->
                     <TextBlock Text="Material:" Margin="0,5,0,5" FontWeight="SemiBold"/>
                     <StackPanel Margin="0,0,0,5">
+                        <RadioButton Content="Random Material" GroupName="Materials" 
+                                     Style="{StaticResource MaterialRadioButton}"
+                                     FontWeight="SemiBold"
+                                     IsChecked="{Binding Objects.SelectedMaterialStyle, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Random}"/>
                         <RadioButton Content="Shiny (Plastic)" GroupName="Materials" 
                                      Style="{StaticResource MaterialRadioButton}"
                                      IsChecked="{Binding Objects.SelectedMaterialStyle, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Shiny}"/>
@@ -180,8 +183,8 @@
                     <TextBlock Text="{Binding Objects.ObjectSize, StringFormat={}{0:F1}}" HorizontalAlignment="Center"/>
 
                     <TextBlock Text="Drop Height:" Margin="0,5,0,0"/>
-                    <Slider Minimum="2" Maximum="15" Value="{Binding Objects.DropHeight}" 
-                            TickFrequency="1" IsSnapToTickEnabled="True"/>
+                    <Slider Minimum="2" Maximum="100" Value="{Binding Objects.DropHeight}" 
+                            TickFrequency="5" SmallChange="1" LargeChange="10"/>
                     <TextBlock Text="{Binding Objects.DropHeight, StringFormat={}{0:F0} m}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </GroupBox>
@@ -200,13 +203,25 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="Low" FontSize="10" VerticalAlignment="Center" Foreground="Gray"/>
                         <Slider Grid.Column="1" Minimum="1" Maximum="30" Value="{Binding Gravity}" 
-                                TickFrequency="1" SmallChange="0.5" Margin="5,0"
-                                IsDirectionReversed="False"/>
+                                TickFrequency="1" SmallChange="0.5" Margin="5,0"/>
                         <TextBlock Grid.Column="2" Text="High" FontSize="10" VerticalAlignment="Center" Foreground="Gray"/>
                     </Grid>
                     <TextBlock Text="{Binding Gravity, StringFormat={}{0:F1} m/s2}" HorizontalAlignment="Center"/>
                     
                     <Button Content="Drop All Objects" Command="{Binding DropAllCommand}" Margin="0,10,0,0"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Theme Settings -->
+            <GroupBox Header="Appearance" Margin="0,0,0,10">
+                <StackPanel Margin="5">
+                    <TextBlock Text="Theme:" Margin="0,0,0,5" FontWeight="SemiBold"/>
+                    <RadioButton Content="Follow Windows" GroupName="Theme" 
+                                 IsChecked="{Binding Settings.IsSystemTheme}" Margin="0,2"/>
+                    <RadioButton Content="Light" GroupName="Theme" 
+                                 IsChecked="{Binding Settings.IsLightTheme}" Margin="0,2"/>
+                    <RadioButton Content="Dark" GroupName="Theme" 
+                                 IsChecked="{Binding Settings.IsDarkTheme}" Margin="0,2"/>
                 </StackPanel>
             </GroupBox>
 
@@ -228,8 +243,8 @@
                     <TextBlock Text="{Binding Selection.SelectedObjectPositionY, StringFormat={}{0:F2}}" HorizontalAlignment="Center"/>
                     
                     <TextBlock Text="Position Z:" Margin="0,5,0,0"/>
-                    <Slider Minimum="0" Maximum="15" Value="{Binding Selection.SelectedObjectPositionZ}" 
-                            TickFrequency="0.5" SmallChange="0.1" LargeChange="1"/>
+                    <Slider Minimum="0" Maximum="100" Value="{Binding Selection.SelectedObjectPositionZ}" 
+                            TickFrequency="5" SmallChange="0.1" LargeChange="5"/>
                     <TextBlock Text="{Binding Selection.SelectedObjectPositionZ, StringFormat={}{0:F2}}" HorizontalAlignment="Center"/>
                     
                     <Separator Margin="0,8"/>
@@ -259,7 +274,7 @@
                     
                     <Button Content="Deselect" Command="{Binding Selection.DeselectCommand}" Margin="0,5,0,5"/>
                     <Button Content="Delete Object" Command="{Binding Selection.DeleteSelectedCommand}" 
-                            Background="#FFDDDD" Margin="0,0,0,5"/>
+                            Style="{DynamicResource DangerButton}" Margin="0,0,0,5"/>
                 </StackPanel>
             </GroupBox>
 
@@ -279,6 +294,7 @@
             <TextBlock Text="Right-drag: Pan view" FontSize="11"/>
             <TextBlock Text="Scroll: Zoom" FontSize="11"/>
             <TextBlock Text="Escape: Deselect" FontSize="11"/>
+            <TextBlock Text="Space: Toggle physics" FontSize="11"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

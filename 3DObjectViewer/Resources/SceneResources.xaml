@@ -1,0 +1,90 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+    ============================================================================
+    SCENE RESOURCES
+    ============================================================================
+    Reusable brushes, materials, and styles for the 3D scene viewports.
+    ============================================================================
+    -->
+
+    <!-- Sky/Background Colors -->
+    <SolidColorBrush x:Key="SkyBackgroundBrush" Color="#87CEEB"/>
+    <SolidColorBrush x:Key="TopViewBackgroundBrush" Color="#2D4A3E"/>
+    <SolidColorBrush x:Key="SideViewBackgroundBrush" Color="#3D2D4A"/>
+
+    <!-- Ground/Terrain Colors -->
+    <Color x:Key="GrassColor1">#4A7C2F</Color>
+    <Color x:Key="GrassColor2">#5D8A3A</Color>
+    <Color x:Key="GrassColor3">#3D6B25</Color>
+    <Color x:Key="SoilColor">#3D2817</Color>
+
+    <!-- Wall/Boundary Colors -->
+    <SolidColorBrush x:Key="WallBrush" Color="#40808080"/>
+    <SolidColorBrush x:Key="BoundaryLineBrush" Color="#80FFFFFF"/>
+    <SolidColorBrush x:Key="GridLineBrush" Color="#30FFFFFF"/>
+
+    <!-- UI Overlay Colors -->
+    <SolidColorBrush x:Key="OverlayBackgroundBrush" Color="#80000000"/>
+    <SolidColorBrush x:Key="OverlayTextDimBrush" Color="#80FFFFFF"/>
+    <SolidColorBrush x:Key="FpsGreenBrush" Color="#00FF00"/>
+    <SolidColorBrush x:Key="MemoryOrangeBrush" Color="#FF9900"/>
+    <SolidColorBrush x:Key="GridLineHintBrush" Color="#40FFFFFF"/>
+
+    <!-- Splitter Style -->
+    <Style x:Key="ViewportSplitterStyle" TargetType="GridSplitter">
+        <Setter Property="Background" Value="#404040"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+
+    <!-- View Label Style -->
+    <Style x:Key="ViewLabelBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource OverlayBackgroundBrush}"/>
+        <Setter Property="CornerRadius" Value="3"/>
+        <Setter Property="Padding" Value="6,3"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Top"/>
+        <Setter Property="Margin" Value="5"/>
+    </Style>
+
+    <Style x:Key="ViewLabelTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <!-- Axis Label Style -->
+    <Style x:Key="AxisLabelStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource OverlayTextDimBrush}"/>
+        <Setter Property="FontSize" Value="9"/>
+    </Style>
+
+    <!-- Performance Stats Styles -->
+    <Style x:Key="StatsOverlayBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource OverlayBackgroundBrush}"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="8"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Top"/>
+        <Setter Property="Margin" Value="10"/>
+    </Style>
+
+    <Style x:Key="StatsLabelStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource OverlayTextDimBrush}"/>
+        <Setter Property="FontSize" Value="11"/>
+    </Style>
+
+    <Style x:Key="StatsValueStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <Style x:Key="StatsSeparatorStyle" TargetType="Rectangle">
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="Fill" Value="{StaticResource GridLineHintBrush}"/>
+        <Setter Property="Margin" Value="0,6"/>
+    </Style>
+
+</ResourceDictionary>

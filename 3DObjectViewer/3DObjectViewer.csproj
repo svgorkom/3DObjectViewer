@@ -10,6 +10,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Services\**" />
+    <EmbeddedResource Remove="Services\**" />
+    <None Remove="Services\**" />
+    <Page Remove="Services\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Services\SceneUpdateCoordinator.cs" />
+    <Compile Include="Services\ThemeService.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- HelixToolkit.Wpf targets .NET Framework but works with .NET Core/5+ via compatibility shim -->
     <PackageReference Include="HelixToolkit.Wpf" Version="2.25.0" NoWarn="NU1701" />
   </ItemGroup>
@@ -20,7 +32,6 @@
 
   <ItemGroup>
     <Folder Include="3DObjectViewer.Core\Physics\" />
-    <Folder Include="Services\" />
   </ItemGroup>
 
 </Project>

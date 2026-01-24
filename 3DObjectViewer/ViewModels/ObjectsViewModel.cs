@@ -27,10 +27,10 @@ public class ObjectsViewModel : ViewModelBase
 {
     private readonly Random _random = new();
     private double _objectSize = 1.0;
-    private ObjectColor _selectedColor = ObjectColor.Red;
-    private MaterialStyle _selectedMaterialStyle = MaterialStyle.Shiny;
-    private double _dropHeight = 5.0;
-    private int _dropCount = 1;
+    private ObjectColor _selectedColor = ObjectColor.Random;
+    private MaterialStyle _selectedMaterialStyle = MaterialStyle.Random;
+    private double _dropHeight = 15.0;
+    private int _dropCount = 20;
     
     // Cached frozen materials for common color/material combinations
     private static readonly Dictionary<(ObjectColor, MaterialStyle), Material> CachedMaterials = new();
@@ -39,6 +39,11 @@ public class ObjectsViewModel : ViewModelBase
     // All available object types for random selection
     private static readonly ObjectType[] AllObjectTypes = 
         [ObjectType.Cube, ObjectType.Sphere, ObjectType.Cylinder, ObjectType.Cone, ObjectType.Torus];
+    
+    // All non-random material styles for random selection
+    private static readonly MaterialStyle[] NonRandomMaterialStyles =
+        [MaterialStyle.Shiny, MaterialStyle.Metallic, MaterialStyle.Matte, 
+         MaterialStyle.Glass, MaterialStyle.Glowing, MaterialStyle.Neon];
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ObjectsViewModel"/> class.
@@ -81,17 +86,10 @@ public class ObjectsViewModel : ViewModelBase
     private static Material CreateShinyMaterial(Color color)
     {
         var materialGroup = new MaterialGroup();
-        
-        // Add diffuse component for base color
         materialGroup.Children.Add(new DiffuseMaterial(new SolidColorBrush(color)));
-        
-        // Add specular highlight for shininess
         materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(Colors.White), 40));
-        
-        // Add subtle emissive component to ensure visibility on flat surfaces
         var emissiveColor = Color.FromArgb(30, color.R, color.G, color.B);
         materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(emissiveColor)));
-        
         materialGroup.Freeze();
         return materialGroup;
     }
@@ -102,25 +100,16 @@ public class ObjectsViewModel : ViewModelBase
     private static Material CreateMetallicMaterial(Color color)
     {
         var materialGroup = new MaterialGroup();
-        
-        // Darker diffuse for metallic look
         var darkColor = Color.FromRgb(
-            (byte)(color.R * 0.3),
-            (byte)(color.G * 0.3),
-            (byte)(color.B * 0.3));
+            (byte)(color.R * 0.3), (byte)(color.G * 0.3), (byte)(color.B * 0.3));
         materialGroup.Children.Add(new DiffuseMaterial(new SolidColorBrush(darkColor)));
-        
-        // Strong colored specular for metallic reflection
         var specColor = Color.FromRgb(
             (byte)Math.Min(255, color.R + 50),
             (byte)Math.Min(255, color.G + 50),
             (byte)Math.Min(255, color.B + 50));
         materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(specColor), 100));
-        
-        // Subtle emissive for shine
         var emissiveColor = Color.FromArgb(40, color.R, color.G, color.B);
         materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(emissiveColor)));
-        
         materialGroup.Freeze();
         return materialGroup;
     }
@@ -131,14 +120,9 @@ public class ObjectsViewModel : ViewModelBase
     private static Material CreateMatteMaterial(Color color)
     {
         var materialGroup = new MaterialGroup();
-        
-        // Only diffuse, no specular
         materialGroup.Children.Add(new DiffuseMaterial(new SolidColorBrush(color)));
-        
-        // Very subtle emissive to prevent completely dark areas
         var emissiveColor = Color.FromArgb(15, color.R, color.G, color.B);
         materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(emissiveColor)));
-        
         materialGroup.Freeze();
         return materialGroup;
     }
@@ -149,18 +133,11 @@ public class ObjectsViewModel : ViewModelBase
     private static Material CreateGlassMaterial(Color color)
     {
         var materialGroup = new MaterialGroup();
-        
-        // Semi-transparent diffuse
         var transparentColor = Color.FromArgb(120, color.R, color.G, color.B);
         materialGroup.Children.Add(new DiffuseMaterial(new SolidColorBrush(transparentColor)));
-        
-        // Strong white specular for glass reflection
         materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(Colors.White), 120));
-        
-        // Subtle emissive for internal glow
         var emissiveColor = Color.FromArgb(50, color.R, color.G, color.B);
         materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(emissiveColor)));
-        
         materialGroup.Freeze();
         return materialGroup;
     }
@@ -171,21 +148,12 @@ public class ObjectsViewModel : ViewModelBase
     private static Material CreateGlowingMaterial(Color color)
     {
         var materialGroup = new MaterialGroup();
-        
-        // Subtle diffuse
         var dimColor = Color.FromRgb(
-            (byte)(color.R * 0.4),
-            (byte)(color.G * 0.4),
-            (byte)(color.B * 0.4));
+            (byte)(color.R * 0.4), (byte)(color.G * 0.4), (byte)(color.B * 0.4));
         materialGroup.Children.Add(new DiffuseMaterial(new SolidColorBrush(dimColor)));
-        
-        // Strong emissive for glow effect
         var glowColor = Color.FromArgb(200, color.R, color.G, color.B);
         materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(glowColor)));
-        
-        // Light specular
         materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(Colors.White), 20));
-        
         materialGroup.Freeze();
         return materialGroup;
     }
@@ -196,26 +164,15 @@ public class ObjectsViewModel : ViewModelBase
     private static Material CreateNeonMaterial(Color color)
     {
         var materialGroup = new MaterialGroup();
-        
-        // Boost color intensity for neon effect
         var brightColor = Color.FromRgb(
             (byte)Math.Min(255, color.R + 30),
             (byte)Math.Min(255, color.G + 30),
             (byte)Math.Min(255, color.B + 30));
-        
-        // Minimal diffuse
         var darkColor = Color.FromRgb(
-            (byte)(color.R * 0.2),
-            (byte)(color.G * 0.2),
-            (byte)(color.B * 0.2));
+            (byte)(color.R * 0.2), (byte)(color.G * 0.2), (byte)(color.B * 0.2));
         materialGroup.Children.Add(new DiffuseMaterial(new SolidColorBrush(darkColor)));
-        
-        // Maximum emissive for neon glow
         materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(brightColor)));
-        
-        // Colored specular
         materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(brightColor), 60));
-        
         materialGroup.Freeze();
         return materialGroup;
     }
@@ -260,21 +217,21 @@ public class ObjectsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Gets or sets the drop height for new objects.
+    /// Gets or sets the drop height for new objects (2-100 meters).
     /// </summary>
     public double DropHeight
     {
         get => _dropHeight;
-        set => SetProperty(ref _dropHeight, value);
+        set => SetProperty(ref _dropHeight, Math.Clamp(value, 2, 100));
     }
 
     /// <summary>
-    /// Gets or sets the number of objects to drop at once.
+    /// Gets or sets the number of objects to drop at once (1-250).
     /// </summary>
     public int DropCount
     {
         get => _dropCount;
-        set => SetProperty(ref _dropCount, Math.Clamp(value, 1, 50));
+        set => SetProperty(ref _dropCount, Math.Clamp(value, 1, 250));
     }
 
     /// <summary>
@@ -311,53 +268,32 @@ public class ObjectsViewModel : ViewModelBase
 
     private void AddCubes()
     {
-        for (int i = 0; i < DropCount; i++)
-        {
-            AddCube();
-        }
+        for (int i = 0; i < DropCount; i++) AddCube();
     }
 
     private void AddSpheres()
     {
-        for (int i = 0; i < DropCount; i++)
-        {
-            AddSphere();
-        }
+        for (int i = 0; i < DropCount; i++) AddSphere();
     }
 
     private void AddCylinders()
     {
-        for (int i = 0; i < DropCount; i++)
-        {
-            AddCylinder();
-        }
+        for (int i = 0; i < DropCount; i++) AddCylinder();
     }
 
     private void AddCones()
     {
-        for (int i = 0; i < DropCount; i++)
-        {
-            AddCone();
-        }
+        for (int i = 0; i < DropCount; i++) AddCone();
     }
 
     private void AddToruses()
     {
-        for (int i = 0; i < DropCount; i++)
-        {
-            AddTorus();
-        }
+        for (int i = 0; i < DropCount; i++) AddTorus();
     }
 
-    /// <summary>
-    /// Adds multiple random objects. Each object gets a randomly selected type.
-    /// </summary>
     private void AddRandomObjects()
     {
-        for (int i = 0; i < DropCount; i++)
-        {
-            AddRandomObject();
-        }
+        for (int i = 0; i < DropCount; i++) AddRandomObject();
     }
 
     #endregion
@@ -436,49 +372,38 @@ public class ObjectsViewModel : ViewModelBase
         ObjectAdded?.Invoke(torus, position);
     }
 
-    // Adds a random object type at a random position using the current object size
     private void AddRandomObject()
     {
-        // Choose a random object type
         var randomObjectType = AllObjectTypes[_random.Next(AllObjectTypes.Length)];
         
         switch (randomObjectType)
         {
-            case ObjectType.Cube:
-                AddCube();
-                break;
-            case ObjectType.Sphere:
-                AddSphere();
-                break;
-            case ObjectType.Cylinder:
-                AddCylinder();
-                break;
-            case ObjectType.Cone:
-                AddCone();
-                break;
-            case ObjectType.Torus:
-                AddTorus();
-                break;
+            case ObjectType.Cube: AddCube(); break;
+            case ObjectType.Sphere: AddSphere(); break;
+            case ObjectType.Cylinder: AddCylinder(); break;
+            case ObjectType.Cone: AddCone(); break;
+            case ObjectType.Torus: AddTorus(); break;
         }
     }
 
     #endregion
 
     /// <summary>
-    /// Creates a material with the currently selected color and material type.
+    /// Creates a material with the currently selected color and material style.
     /// </summary>
     public Material CreateMaterial()
     {
         var color = GetColorValue();
+        var materialStyle = GetMaterialStyle();
         
-        // Random colors always get fresh materials
-        if (SelectedColor == ObjectColor.Random)
+        // Random combinations always get fresh materials
+        if (SelectedColor == ObjectColor.Random || SelectedMaterialStyle == MaterialStyle.Random)
         {
-            return CreateMaterialForStyle(color, SelectedMaterialStyle);
+            return CreateMaterialForStyle(color, materialStyle);
         }
         
         // Use cached materials for standard color/material combinations
-        var key = (SelectedColor, SelectedMaterialStyle);
+        var key = (SelectedColor, materialStyle);
         lock (CacheLock)
         {
             if (CachedMaterials.TryGetValue(key, out var cachedMaterial))
@@ -486,10 +411,19 @@ public class ObjectsViewModel : ViewModelBase
                 return cachedMaterial;
             }
             
-            var material = CreateMaterialForStyle(color, SelectedMaterialStyle);
+            var material = CreateMaterialForStyle(color, materialStyle);
             CachedMaterials[key] = material;
             return material;
         }
+    }
+
+    private MaterialStyle GetMaterialStyle()
+    {
+        if (SelectedMaterialStyle == MaterialStyle.Random)
+        {
+            return NonRandomMaterialStyles[_random.Next(NonRandomMaterialStyles.Length)];
+        }
+        return SelectedMaterialStyle;
     }
 
     private Color GetColorValue()
@@ -507,7 +441,7 @@ public class ObjectsViewModel : ViewModelBase
             ObjectColor.White => Colors.White,
             ObjectColor.Gold => Colors.Gold,
             ObjectColor.Random => Color.FromRgb(
-                (byte)_random.Next(100, 256),  // Avoid too dark colors
+                (byte)_random.Next(100, 256),
                 (byte)_random.Next(100, 256),
                 (byte)_random.Next(100, 256)),
             _ => Colors.Gray
@@ -519,14 +453,13 @@ public class ObjectsViewModel : ViewModelBase
     /// </summary>
     private Point3D GetDropPosition(double objectHeight)
     {
-        // Spread objects more when dropping multiple (extended by factor 4)
         double spreadFactor = DropCount > 1 ? 32 : 24;
         double halfSpread = spreadFactor / 2;
         
         return new Point3D(
             _random.NextDouble() * spreadFactor - halfSpread,
             _random.NextDouble() * spreadFactor - halfSpread,
-            DropHeight + objectHeight / 2 + _random.NextDouble() * 2  // Slight height variation
+            DropHeight + objectHeight / 2 + _random.NextDouble() * 2
         );
     }
 }

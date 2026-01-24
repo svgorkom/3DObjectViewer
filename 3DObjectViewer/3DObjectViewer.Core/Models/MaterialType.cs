@@ -12,6 +12,7 @@ namespace _3DObjectViewer.Core.Models;
 ///   <item><see cref="Glass"/> - Semi-transparent with high specular</item>
 ///   <item><see cref="Glowing"/> - Emissive material that appears to emit light</item>
 ///   <item><see cref="Neon"/> - Bright glowing effect with color bleeding</item>
+///   <item><see cref="Random"/> - Randomly selected material style</item>
 /// </list>
 /// </remarks>
 public enum MaterialStyle
@@ -44,5 +45,10 @@ public enum MaterialStyle
     /// <summary>
     /// Bright neon effect with strong emission.
     /// </summary>
-    Neon
+    Neon,
+
+    /// <summary>
+    /// Randomly selected material style for variety.
+    /// </summary>
+    Random
 }
