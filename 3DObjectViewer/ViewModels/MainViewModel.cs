@@ -12,7 +12,7 @@ namespace _3DObjectViewer.ViewModels;
 /// Main ViewModel that orchestrates the 3D Object Viewer application.
 /// </summary>
 /// <remarks>
-/// This ViewModel composes the specialized ViewModels for objects, selection, and lighting,
+/// This ViewModel composes the specialized ViewModels for objects and selection,
 /// providing a unified interface for the main window.
 /// </remarks>
 public class MainViewModel : ViewModelBase
@@ -49,7 +49,6 @@ public class MainViewModel : ViewModelBase
         // Create child ViewModels
         Objects = new ObjectsViewModel(SceneObjects);
         Selection = new SelectionViewModel(SceneObjects, Objects);
-        Lighting = new LightingViewModel();
         PerformanceStats = new PerformanceStatsViewModel();
 
         // Scene commands
@@ -62,7 +61,6 @@ public class MainViewModel : ViewModelBase
         Selection.SelectionChanged += () => SelectionChanged?.Invoke();
         Selection.ObjectDeleted += OnObjectDeleted;
         Selection.ObjectMoved += OnObjectMoved;
-        Lighting.LightingChanged += () => LightingChanged?.Invoke();
 
         // Subscribe to object additions for physics
         Objects.ObjectAdded += OnObjectAdded;
@@ -94,11 +92,6 @@ public class MainViewModel : ViewModelBase
     public event Action? SelectionChanged;
 
     /// <summary>
-    /// Occurs when lighting configuration changes.
-    /// </summary>
-    public event Action? LightingChanged;
-
-    /// <summary>
     /// Occurs when physics updates an object's position.
     /// </summary>
     public event Action? PhysicsUpdated;
@@ -116,11 +109,6 @@ public class MainViewModel : ViewModelBase
     /// Gets the ViewModel for selected object manipulation.
     /// </summary>
     public SelectionViewModel Selection { get; }
-
-    /// <summary>
-    /// Gets the ViewModel for lighting management.
-    /// </summary>
-    public LightingViewModel Lighting { get; }
 
     /// <summary>
     /// Gets the ViewModel for performance statistics display.
@@ -196,20 +184,6 @@ public class MainViewModel : ViewModelBase
     /// Gets a value indicating whether an object is currently selected.
     /// </summary>
     public bool HasSelection => Selection.HasSelection;
-
-    /// <summary>
-    /// Gets the collection of light sources.
-    /// </summary>
-    public ObservableCollection<LightSource> LightSources => Lighting.LightSources;
-
-    /// <summary>
-    /// Gets or sets the currently selected light source.
-    /// </summary>
-    public LightSource? SelectedLight
-    {
-        get => Lighting.SelectedLight;
-        set => Lighting.SelectedLight = value;
-    }
 
     #endregion
 

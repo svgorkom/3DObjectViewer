@@ -16,7 +16,6 @@ graph TB
             VM[ViewModels/]
             R[Rendering/]
             P[Physics/]
-            S[Services/]
             D[Design/]
         end
         
@@ -43,7 +42,7 @@ A reusable class library containing platform-independent core functionality:
 | **Infrastructure/** | MVVM base classes (`ViewModelBase`, `RelayCommand`) and value converters |
 | **Physics/** | Physics engine with SIMD-optimized collision detection (`PhysicsEngine`, `RigidBody`, `SimdMath`) |
 | **Rendering/Abstractions/** | Renderer interfaces and contracts (`IRenderer`, `ISceneObject`, `IRendererFactory`) |
-| **Models/** | Shared data models (`LightSource`, `ObjectColor`) |
+| **Models/** | Shared data models (`ObjectColor`) |
 | **Helpers/** | Utility classes (`DragPlane3D`) |
 
 ### 3DObjectViewer (Application)
@@ -55,8 +54,6 @@ The WPF application containing UI and renderer implementations:
 | **Views/** | XAML controls and user interfaces |
 | **ViewModels/** | Application-specific view models (`MainViewModel`, `ObjectsViewModel`, etc.) |
 | **Rendering/HelixWpf/** | HelixToolkit.Wpf renderer implementation |
-| **Rendering/Services/** | Lighting and shadow services |
-| **Services/** | Scene orchestration (`SceneService`) |
 | **Physics/** | Visual-specific physics helpers (`PhysicsHelper`) |
 
 ## Features
@@ -64,8 +61,6 @@ The WPF application containing UI and renderer implementations:
 - **Object Creation**: Add 3D primitives (cubes, spheres, cylinders, cones, toruses)
 - **Physics Simulation**: SIMD-accelerated gravity, collisions, and object dynamics
 - **Object Manipulation**: Select, drag, rotate, and scale objects
-- **Dynamic Lighting**: Multiple configurable light sources with presets
-- **Real-time Shadows**: Objects cast shadows onto the ground plane
 - **Performance Monitoring**: Live FPS, memory, and triangle count display
 
 ## Architecture
@@ -88,14 +83,6 @@ flowchart TB
         IR --> Helix
     end
     
-    subgraph Facade["Facade Pattern"]
-        SS[SceneService]
-        LS[LightingService]
-        ShadowS[ShadowService]
-        SS --> LS
-        SS --> ShadowS
-    end
-    
     subgraph Observer["Observer Pattern"]
         Events[Events]
         Handlers[Event Handlers]
@@ -105,7 +92,6 @@ flowchart TB
 
 - **MVVM**: Clean separation of UI (Views), logic (ViewModels), and data (Models)
 - **Strategy Pattern**: Swappable renderer implementations via `IRenderer`
-- **Facade Pattern**: `SceneService` coordinates lighting and shadow services
 - **Observer Pattern**: Event-driven communication between components
 
 ### Key Dependencies

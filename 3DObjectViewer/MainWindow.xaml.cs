@@ -5,8 +5,6 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using _3DObjectViewer.Core.Helpers;
-using _3DObjectViewer.Core.Models;
-using _3DObjectViewer.Services;
 using _3DObjectViewer.ViewModels;
 using HelixToolkit.Wpf;
 
@@ -18,8 +16,7 @@ namespace _3DObjectViewer;
 /// <remarks>
 /// <para>
 /// This window serves as the View in the MVVM pattern, coordinating between
-/// the ViewModel and the 3D viewport. It delegates most rendering logic to
-/// the <see cref="SceneService"/>.
+/// the ViewModel and the 3D viewport.
 /// </para>
 /// <para>
 /// The window handles view-specific concerns that cannot be easily moved to ViewModels:
@@ -38,8 +35,8 @@ namespace _3DObjectViewer;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
-    private readonly SceneService _sceneService;
     private readonly BoundingBoxVisual3D _selectionBox;
+    private readonly ModelVisual3D _terrainVisual;
     
     private bool _isDragging;
     private Point _lastMousePosition;
@@ -67,9 +64,6 @@ public partial class MainWindow : Window
         _viewModel = new MainViewModel();
         DataContext = _viewModel;
 
-        // Initialize scene service
-        _sceneService = new SceneService(HelixViewport);
-
         // Create selection box indicator
         _selectionBox = new BoundingBoxVisual3D 
         { 
@@ -78,16 +72,15 @@ public partial class MainWindow : Window
         };
         HelixViewport.Children.Add(_selectionBox);
 
+        // Create terrain with gentle hills
+        _terrainVisual = CreateTerrainVisual();
+        HelixViewport.Children.Add(_terrainVisual);
+
         // Subscribe to ViewModel events
         _viewModel.ResetCameraRequested += OnResetCameraRequested;
         _viewModel.SceneObjects.CollectionChanged += OnSceneObjectsChanged;
         _viewModel.SelectionChanged += OnSelectionChanged;
-        _viewModel.LightingChanged += OnLightingChanged;
         _viewModel.PhysicsUpdated += OnPhysicsUpdated;
-        _viewModel.Lighting.LightSources.CollectionChanged += OnLightSourcesCollectionChanged;
-
-        // Initialize lights
-        _sceneService.UpdateAllLights(_viewModel.Lighting.LightSources);
 
         // Handle keyboard input
         KeyDown += OnKeyDown;
@@ -100,13 +93,105 @@ public partial class MainWindow : Window
         Closed += OnWindowClosed;
     }
 
+    #region Terrain Creation
+
     /// <summary>
-    /// Handles light sources collection changes.
+    /// Creates a flat terrain visual matching the physics ground plane.
     /// </summary>
-    private void OnLightSourcesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    /// <remarks>
+    /// The terrain is kept flat to match the physics simulation which uses a flat ground plane.
+    /// The visual terrain is at Z=0 to align with the physics ground surface.
+    /// </remarks>
+    private static ModelVisual3D CreateTerrainVisual()
     {
-        OnLightingChanged();
+        const int resolution = 40; // Grid resolution
+        const double size = 40.0;  // Total terrain size
+        const double halfSize = size / 2;
+        const double step = size / resolution;
+        
+        var positions = new Point3DCollection();
+        var normals = new Vector3DCollection();
+        var textureCoords = new PointCollection();
+        var triangleIndices = new Int32Collection();
+        
+        // Generate flat height map (Z=0 everywhere to match physics ground)
+        // This ensures objects don't fall through the visual terrain
+        
+        // Generate mesh vertices
+        for (int i = 0; i <= resolution; i++)
+        {
+            for (int j = 0; j <= resolution; j++)
+            {
+                double x = -halfSize + i * step;
+                double y = -halfSize + j * step;
+                double z = 0; // Flat ground at Z=0
+                
+                positions.Add(new Point3D(x, y, z));
+                textureCoords.Add(new Point((double)i / resolution, (double)j / resolution));
+                normals.Add(new Vector3D(0, 0, 1)); // All normals point up
+            }
+        }
+        
+        // Generate triangle indices
+        for (int i = 0; i < resolution; i++)
+        {
+            for (int j = 0; j < resolution; j++)
+            {
+                int topLeft = i * (resolution + 1) + j;
+                int topRight = topLeft + 1;
+                int bottomLeft = (i + 1) * (resolution + 1) + j;
+                int bottomRight = bottomLeft + 1;
+                
+                // First triangle
+                triangleIndices.Add(topLeft);
+                triangleIndices.Add(bottomLeft);
+                triangleIndices.Add(topRight);
+                
+                // Second triangle
+                triangleIndices.Add(topRight);
+                triangleIndices.Add(bottomLeft);
+                triangleIndices.Add(bottomRight);
+            }
+        }
+        
+        // Create mesh
+        var mesh = new MeshGeometry3D
+        {
+            Positions = positions,
+            Normals = normals,
+            TextureCoordinates = textureCoords,
+            TriangleIndices = triangleIndices
+        };
+        mesh.Freeze();
+        
+        // Create grass material with gradient for visual interest
+        var grassBrush = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(1, 1)
+        };
+        grassBrush.GradientStops.Add(new GradientStop(Color.FromRgb(74, 124, 47), 0));    // Dark grass
+        grassBrush.GradientStops.Add(new GradientStop(Color.FromRgb(93, 138, 58), 0.3));  // Medium grass
+        grassBrush.GradientStops.Add(new GradientStop(Color.FromRgb(61, 107, 37), 0.7));  // Darker grass
+        grassBrush.GradientStops.Add(new GradientStop(Color.FromRgb(74, 124, 47), 1));    // Dark grass
+        grassBrush.Freeze();
+        
+        var material = new MaterialGroup();
+        material.Children.Add(new DiffuseMaterial(grassBrush));
+        material.Freeze();
+        
+        var geometry = new GeometryModel3D
+        {
+            Geometry = mesh,
+            Material = material,
+            BackMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(61, 40, 23))) // Brown underside
+        };
+        geometry.Freeze();
+        
+        return new ModelVisual3D { Content = geometry };
     }
+
+    #endregion
 
     /// <summary>
     /// Cleans up event subscriptions when the window is closed to prevent memory leaks.
@@ -120,9 +205,7 @@ public partial class MainWindow : Window
         _viewModel.ResetCameraRequested -= OnResetCameraRequested;
         _viewModel.SceneObjects.CollectionChanged -= OnSceneObjectsChanged;
         _viewModel.SelectionChanged -= OnSelectionChanged;
-        _viewModel.LightingChanged -= OnLightingChanged;
         _viewModel.PhysicsUpdated -= OnPhysicsUpdated;
-        _viewModel.Lighting.LightSources.CollectionChanged -= OnLightSourcesCollectionChanged;
         
         // Stop physics engine
         _viewModel.PhysicsEngine.Stop();
@@ -386,11 +469,6 @@ public partial class MainWindow : Window
         UpdateSelectionBox();
     }
 
-    private void OnLightingChanged()
-    {
-        _sceneService.UpdateAllLights(_viewModel.Lighting.LightSources);
-    }
-
     private void OnPhysicsUpdated()
     {
         // Update selection box if selected object is moving
@@ -443,8 +521,8 @@ public partial class MainWindow : Window
 
     private void OnResetCameraRequested()
     {
-        HelixViewport.Camera.Position = new Point3D(10, 10, 10);
-        HelixViewport.Camera.LookDirection = new Vector3D(-10, -10, -10);
+        HelixViewport.Camera.Position = new Point3D(15, 15, 12);
+        HelixViewport.Camera.LookDirection = new Vector3D(-15, -15, -12);
         HelixViewport.Camera.UpDirection = new Vector3D(0, 0, 1);
     }
 

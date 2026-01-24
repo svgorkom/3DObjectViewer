@@ -104,15 +104,6 @@ public interface IRenderer : IDisposable
 
     #endregion
 
-    #region Lighting
-
-    /// <summary>
-    /// Updates all lights in the scene.
-    /// </summary>
-    void UpdateLights(IEnumerable<LightSource> lightSources);
-
-    #endregion
-
     #region Hit Testing
 
     /// <summary>

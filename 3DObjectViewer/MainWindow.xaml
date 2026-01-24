@@ -16,16 +16,16 @@
     This window provides a 3D object viewing and manipulation environment.
     
     LAYOUT STRUCTURE:
-    ┌─────────────┬────────────────────────────┬─────────────┐
-    │   Left      │                            │   Right     │
-    │   Panel     │     3D Viewport            │   Panel     │
-    │   (220px)   │     (flexible)             │   (220px)   │
-    │             │                            │             │
-    │   Object    │   - Camera controls        │   Lighting  │
-    │   Controls  │   - Ground plane           │   Controls  │
-    │             │   - Grid overlay           │             │
-    │             │   - Coordinate system      │             │
-    └─────────────┴────────────────────────────┴─────────────┘
+    ┌─────────────┬────────────────────────────────────────────┐
+    │   Left      │                                            │
+    │   Panel     │     3D Viewport                            │
+    │   (220px)   │     (flexible)                             │
+    │             │                                            │
+    │   Object    │   - Camera controls                        │
+    │   Controls  │   - Ground plane                           │
+    │             │   - Grid overlay                           │
+    │             │   - Coordinate system                      │
+    └─────────────┴────────────────────────────────────────────┘
     
     INTERACTION:
     - Left-click: Select objects in the viewport
@@ -44,15 +44,13 @@
     
     <Grid>
         <!-- 
-        THREE-COLUMN LAYOUT:
+        TWO-COLUMN LAYOUT:
         Column 0: Left control panel for object management (fixed 220px)
         Column 1: Main 3D viewport (flexible, takes remaining space)
-        Column 2: Right control panel for lighting (fixed 220px)
         -->
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="220"/>
             <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="220"/>
         </Grid.ColumnDefinitions>
 
         <!--
@@ -79,65 +77,76 @@
         -->
         <Grid Grid.Column="1">
             <h:HelixViewport3D x:Name="HelixViewport"
-                               Background="LightGray"
+                               Background="#87CEEB"
                                ShowCoordinateSystem="True"
                                ZoomExtentsWhenLoaded="True"
                                MouseDown="HelixViewport_MouseDown"
                                MouseMove="HelixViewport_MouseMove"
                                MouseUp="HelixViewport_MouseUp">
                 
-                <!-- ...existing Camera, AmbientLight, RectangleVisual3D, GridLinesVisual3D... -->
+                <!-- Camera with a nice viewing angle -->
                 <h:HelixViewport3D.Camera>
-                    <PerspectiveCamera Position="10,10,10" 
-                                       LookDirection="-10,-10,-10" 
+                    <PerspectiveCamera Position="15,15,12" 
+                                       LookDirection="-15,-15,-12" 
                                        UpDirection="0,0,1" 
                                        FieldOfView="45"/>
                 </h:HelixViewport3D.Camera>
 
                 <ModelVisual3D x:Name="AmbientLightVisual">
                     <ModelVisual3D.Content>
-                        <AmbientLight Color="#404040"/>
+                        <AmbientLight Color="#606060"/>
                     </ModelVisual3D.Content>
                 </ModelVisual3D>
                 
-                <h:RectangleVisual3D Width="20" Length="20" 
-                                      Origin="0,0,0"
+                <!-- Sun light for natural outdoor lighting -->
+                <ModelVisual3D>
+                    <ModelVisual3D.Content>
+                        <DirectionalLight Color="#FFFEF0" Direction="-1,-1,-1"/>
+                    </ModelVisual3D.Content>
+                </ModelVisual3D>
+                
+                <!-- Landscape ground - generated in code-behind as TerrainVisual -->
+                <!-- Placeholder flat ground with grass color - will be enhanced in code -->
+                <h:RectangleVisual3D x:Name="GroundPlane" Width="40" Length="40" 
+                                      Origin="0,0,-0.01"
                                       Normal="0,0,1"
                                       LengthDirection="1,0,0">
                     <h:RectangleVisual3D.Material>
-                        <DiffuseMaterial>
-                            <DiffuseMaterial.Brush>
-                                <SolidColorBrush Color="#E8E8E8"/>
-                            </DiffuseMaterial.Brush>
-                        </DiffuseMaterial>
+                        <MaterialGroup>
+                            <DiffuseMaterial>
+                                <DiffuseMaterial.Brush>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#4A7C2F" Offset="0"/>
+                                        <GradientStop Color="#5D8A3A" Offset="0.3"/>
+                                        <GradientStop Color="#3D6B25" Offset="0.7"/>
+                                        <GradientStop Color="#4A7C2F" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </DiffuseMaterial.Brush>
+                            </DiffuseMaterial>
+                        </MaterialGroup>
                     </h:RectangleVisual3D.Material>
                     <h:RectangleVisual3D.BackMaterial>
                         <DiffuseMaterial>
                             <DiffuseMaterial.Brush>
-                                <SolidColorBrush Color="#E8E8E8"/>
+                                <SolidColorBrush Color="#3D2817"/>
                             </DiffuseMaterial.Brush>
                         </DiffuseMaterial>
                     </h:RectangleVisual3D.BackMaterial>
                 </h:RectangleVisual3D>
                 
+                <!-- Subtle grid overlay on the ground -->
                 <h:GridLinesVisual3D Width="20" Length="20" 
                                       MajorDistance="2" 
                                       MinorDistance="1" 
-                                      Thickness="0.02" 
-                                      Center="0,0,0.01"/>
+                                      Thickness="0.01"
+                                      Center="0,0,0.02"/>
 
                 <!-- 
-                Bucket Walls (4m height, matching grid dimensions)
-                Using RectangleVisual3D for each wall face
-                Grid is 20x20, centered at origin, so walls are at X=±10, Y=±10
-                Wall height is 4m, starting from Z=0 to Z=4
-                
-                RectangleVisual3D properties:
-                - Origin: CENTER of the rectangle
-                - Width: extends perpendicular to Normal and LengthDirection  
-                - Length: extends along LengthDirection
-                - Normal: direction the rectangle faces
-                - LengthDirection: direction of the Length dimension
+                ================================================================
+                BUCKET/ARENA WALLS 
+                ================================================================
+                Semi-transparent walls around the play area (20x20, 4m height)
+                ================================================================
                 -->
                 
                 <!-- Front wall (Y = +10) - vertical wall facing -Y -->
@@ -148,14 +157,14 @@
                     <h:RectangleVisual3D.Material>
                         <DiffuseMaterial>
                             <DiffuseMaterial.Brush>
-                                <SolidColorBrush Color="#60A0A0A0"/>
+                                <SolidColorBrush Color="#40808080"/>
                             </DiffuseMaterial.Brush>
                         </DiffuseMaterial>
                     </h:RectangleVisual3D.Material>
                     <h:RectangleVisual3D.BackMaterial>
                         <DiffuseMaterial>
                             <DiffuseMaterial.Brush>
-                                <SolidColorBrush Color="#60A0A0A0"/>
+                                <SolidColorBrush Color="#40808080"/>
                             </DiffuseMaterial.Brush>
                         </DiffuseMaterial>
                     </h:RectangleVisual3D.BackMaterial>
@@ -169,14 +178,14 @@
                     <h:RectangleVisual3D.Material>
                         <DiffuseMaterial>
                             <DiffuseMaterial.Brush>
-                                <SolidColorBrush Color="#60A0A0A0"/>
+                                <SolidColorBrush Color="#40808080"/>
                             </DiffuseMaterial.Brush>
                         </DiffuseMaterial>
                     </h:RectangleVisual3D.Material>
                     <h:RectangleVisual3D.BackMaterial>
                         <DiffuseMaterial>
                             <DiffuseMaterial.Brush>
-                                <SolidColorBrush Color="#60A0A0A0"/>
+                                <SolidColorBrush Color="#40808080"/>
                             </DiffuseMaterial.Brush>
                         </DiffuseMaterial>
                     </h:RectangleVisual3D.BackMaterial>
@@ -190,14 +199,14 @@
                     <h:RectangleVisual3D.Material>
                         <DiffuseMaterial>
                             <DiffuseMaterial.Brush>
-                                <SolidColorBrush Color="#60A0A0A0"/>
+                                <SolidColorBrush Color="#40808080"/>
                             </DiffuseMaterial.Brush>
                         </DiffuseMaterial>
                     </h:RectangleVisual3D.Material>
                     <h:RectangleVisual3D.BackMaterial>
                         <DiffuseMaterial>
                             <DiffuseMaterial.Brush>
-                                <SolidColorBrush Color="#60A0A0A0"/>
+                                <SolidColorBrush Color="#40808080"/>
                             </DiffuseMaterial.Brush>
                         </DiffuseMaterial>
                     </h:RectangleVisual3D.BackMaterial>
@@ -211,14 +220,14 @@
                     <h:RectangleVisual3D.Material>
                         <DiffuseMaterial>
                             <DiffuseMaterial.Brush>
-                                <SolidColorBrush Color="#60A0A0A0"/>
+                                <SolidColorBrush Color="#40808080"/>
                             </DiffuseMaterial.Brush>
                         </DiffuseMaterial>
                     </h:RectangleVisual3D.Material>
                     <h:RectangleVisual3D.BackMaterial>
                         <DiffuseMaterial>
                             <DiffuseMaterial.Brush>
-                                <SolidColorBrush Color="#60A0A0A0"/>
+                                <SolidColorBrush Color="#40808080"/>
                             </DiffuseMaterial.Brush>
                         </DiffuseMaterial>
                     </h:RectangleVisual3D.BackMaterial>
@@ -357,21 +366,5 @@
                 </StackPanel>
             </Border>
         </Grid>
-
-        <!--
-        ========================================================================
-        RIGHT CONTROL PANEL - LIGHTING MANAGEMENT
-        ========================================================================
-        Contains controls for:
-        - Adding/removing light sources
-        - Adjusting light position (X, Y, Z coordinates)
-        - Setting light direction (for directional lights)
-        - Modifying light color and intensity
-        - Managing multiple light sources in the scene
-        
-        DataContext: Inherits from parent (MainViewModel.Lighting)
-        ========================================================================
-        -->
-        <controls:LightingControlPanel Grid.Column="2" DataContext="{Binding}"/>
     </Grid>
 </Window>

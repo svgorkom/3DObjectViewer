@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <Folder Include="3DObjectViewer.Core\Physics\" />
+    <Folder Include="Services\" />
   </ItemGroup>
 
 </Project>

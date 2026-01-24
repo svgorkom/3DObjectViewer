@@ -14,8 +14,6 @@ public sealed class HelixWpfRenderer : IRenderer
 {
     private readonly HelixViewport3D _viewport;
     private readonly Dictionary<Guid, ISceneObject> _objects = new();
-    private readonly Dictionary<LightSource, ModelVisual3D> _lightVisuals = new();
-    private readonly Dictionary<LightSource, ModelVisual3D> _lampFixtures = new();
     private readonly Dictionary<Guid, (double radiusX, double radiusY)> _boundsCache = new();
     
     private readonly BoundingBoxVisual3D _selectionBox;
@@ -75,8 +73,6 @@ public sealed class HelixWpfRenderer : IRenderer
     public void Dispose()
     {
         ClearObjects();
-        _lightVisuals.Clear();
-        _lampFixtures.Clear();
     }
 
     #region Object Management
@@ -230,140 +226,6 @@ public sealed class HelixWpfRenderer : IRenderer
                 bounds.SizeZ + 0.2);
             _selectionBox.BoundingBox = expanded;
         }
-    }
-
-    #endregion
-
-    #region Lighting
-
-    /// <inheritdoc/>
-    public void UpdateLights(IEnumerable<LightSource> lightSources)
-    {
-        // Remove existing lights
-        foreach (var visual in _lightVisuals.Values)
-            _viewport.Children.Remove(visual);
-        _lightVisuals.Clear();
-
-        foreach (var fixture in _lampFixtures.Values)
-            _viewport.Children.Remove(fixture);
-        _lampFixtures.Clear();
-
-        // Add new lights
-        foreach (var light in lightSources)
-        {
-            var lightVisual = CreateLightVisual(light);
-            _lightVisuals[light] = lightVisual;
-            _viewport.Children.Add(lightVisual);
-
-            var fixture = CreateLampFixtureVisual(light);
-            _lampFixtures[light] = fixture;
-            _viewport.Children.Add(fixture);
-        }
-    }
-
-    private static ModelVisual3D CreateLightVisual(LightSource light)
-    {
-        var directionalLight = new DirectionalLight
-        {
-            Color = light.EffectiveColor,
-            Direction = light.Direction
-        };
-
-        return new ModelVisual3D
-        {
-            Content = directionalLight,
-            Transform = Transform3D.Identity
-        };
-    }
-
-    private static ModelVisual3D CreateLampFixtureVisual(LightSource light)
-    {
-        var fixtureGroup = new ModelVisual3D();
-
-        var housingMaterial = CreateFrozenMaterial(Color.FromRgb(40, 40, 40));
-        var housing = new PipeVisual3D
-        {
-            Point1 = new Point3D(0, 0, -0.3),
-            Point2 = new Point3D(0, 0, 0),
-            Diameter = 0.4,
-            InnerDiameter = 0,
-            Material = housingMaterial,
-            Transform = Transform3D.Identity
-        };
-
-        var coneColor = Color.FromArgb(140, light.Color.R, light.Color.G, light.Color.B);
-        var coneMaterial = CreateFrozenMaterial(coneColor);
-        var lightCone = new TruncatedConeVisual3D
-        {
-            Origin = new Point3D(0, 0, 0),
-            Height = 1.5,
-            BaseRadius = 0.15,
-            TopRadius = 0.6,
-            Material = coneMaterial,
-            Transform = Transform3D.Identity
-        };
-
-        var glowColor = Color.FromArgb(220,
-            (byte)Math.Min(255, light.Color.R + 50),
-            (byte)Math.Min(255, light.Color.G + 50),
-            (byte)Math.Min(255, light.Color.B + 50));
-        var glowMaterial = new EmissiveMaterial(new SolidColorBrush(glowColor));
-        glowMaterial.Freeze();
-        var bulb = new SphereVisual3D
-        {
-            Center = new Point3D(0, 0, 0.05),
-            Radius = 0.12,
-            Material = glowMaterial,
-            Transform = Transform3D.Identity
-        };
-
-        var bracketMaterial = CreateFrozenMaterial(Color.FromRgb(60, 60, 60));
-        var bracket = new PipeVisual3D
-        {
-            Point1 = new Point3D(0, 0, -0.3),
-            Point2 = new Point3D(0, 0, -0.6),
-            Diameter = 0.1,
-            InnerDiameter = 0,
-            Material = bracketMaterial,
-            Transform = Transform3D.Identity
-        };
-
-        fixtureGroup.Children.Add(housing);
-        fixtureGroup.Children.Add(lightCone);
-        fixtureGroup.Children.Add(bulb);
-        fixtureGroup.Children.Add(bracket);
-        fixtureGroup.Transform = CreateLampTransform(light);
-
-        return fixtureGroup;
-    }
-
-    private static Transform3D CreateLampTransform(LightSource light)
-    {
-        var transformGroup = new Transform3DGroup();
-        var direction = light.Direction;
-        direction.Normalize();
-
-        var defaultDir = new Vector3D(0, 0, 1);
-        var dot = Vector3D.DotProduct(defaultDir, direction);
-
-        if (Math.Abs(dot + 1) < 0.0001)
-        {
-            transformGroup.Children.Add(new RotateTransform3D(
-                new AxisAngleRotation3D(new Vector3D(1, 0, 0), 180)));
-        }
-        else if (Math.Abs(dot - 1) > 0.0001)
-        {
-            var rotationAxis = Vector3D.CrossProduct(defaultDir, direction);
-            rotationAxis.Normalize();
-            var angle = Math.Acos(Math.Clamp(dot, -1.0, 1.0)) * 180.0 / Math.PI;
-            transformGroup.Children.Add(new RotateTransform3D(
-                new AxisAngleRotation3D(rotationAxis, angle)));
-        }
-
-        transformGroup.Children.Add(new TranslateTransform3D(
-            light.PositionX, light.PositionY, light.PositionZ));
-
-        return transformGroup;
     }
 
     #endregion

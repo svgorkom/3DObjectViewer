@@ -339,8 +339,13 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
         }
         _boundaryStatics.Clear();
 
-        // Ground plane
-        AddStaticBox(new Vector3(0, 0, _groundLevel - 0.5f), 100, 100, 1);
+        // Ground plane: Create a thick box so objects can't tunnel through
+        // The ground surface should be at Z = _groundLevel
+        // Box dimensions are full width/height/length (not half-extents)
+        // Center the box so its top surface is at _groundLevel
+        const float groundThickness = 2f;
+        float groundCenterZ = _groundLevel - groundThickness / 2f;
+        AddStaticBox(new Vector3(0, 0, groundCenterZ), 200, 200, groundThickness);
 
         if (_bucketEnabled)
         {
@@ -349,22 +354,28 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
             float bucketDepth = _bucketMaxY - _bucketMinY;
             float centerX = (_bucketMinX + _bucketMaxX) / 2;
             float centerY = (_bucketMinY + _bucketMaxY) / 2;
-            float halfHeight = _bucketHeight / 2;
+            float wallCenterZ = _groundLevel + _bucketHeight / 2;
 
-            AddStaticBox(new Vector3(_bucketMinX - wallThickness / 2, centerY, halfHeight),
-                wallThickness, bucketDepth, _bucketHeight);
-            AddStaticBox(new Vector3(_bucketMaxX + wallThickness / 2, centerY, halfHeight),
-                wallThickness, bucketDepth, _bucketHeight);
-            AddStaticBox(new Vector3(centerX, _bucketMinY - wallThickness / 2, halfHeight),
+            // Left wall (-X)
+            AddStaticBox(new Vector3(_bucketMinX - wallThickness / 2, centerY, wallCenterZ),
+                wallThickness, bucketDepth + wallThickness * 2, _bucketHeight);
+            // Right wall (+X)
+            AddStaticBox(new Vector3(_bucketMaxX + wallThickness / 2, centerY, wallCenterZ),
+                wallThickness, bucketDepth + wallThickness * 2, _bucketHeight);
+            // Front wall (-Y)
+            AddStaticBox(new Vector3(centerX, _bucketMinY - wallThickness / 2, wallCenterZ),
                 bucketWidth + wallThickness * 2, wallThickness, _bucketHeight);
-            AddStaticBox(new Vector3(centerX, _bucketMaxY + wallThickness / 2, halfHeight),
+            // Back wall (+Y)
+            AddStaticBox(new Vector3(centerX, _bucketMaxY + wallThickness / 2, wallCenterZ),
                 bucketWidth + wallThickness * 2, wallThickness, _bucketHeight);
         }
     }
 
-    private void AddStaticBox(Vector3 position, float width, float depth, float height)
+    private void AddStaticBox(Vector3 position, float sizeX, float sizeY, float sizeZ)
     {
-        var box = new Box(width, depth, height);
+        // BEPU Box constructor takes full dimensions (not half-extents)
+        // Box(width, height, length) where width=X, height=Y, length=Z
+        var box = new Box(sizeX, sizeY, sizeZ);
         var shapeIndex = _simulation.Shapes.Add(box);
         var handle = _simulation.Statics.Add(new StaticDescription(position, shapeIndex));
         _boundaryStatics.Add(handle);

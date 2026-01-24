@@ -66,7 +66,6 @@ graph TB
         end
         
         subgraph Models["Models/"]
-            LS[LightSource.cs]
             OC[ObjectColor.cs]
         end
         
@@ -108,7 +107,6 @@ flowchart TB
         end
         
         subgraph ModelsLayer["Models Layer"]
-            LS[LightSource]
             OC[ObjectColor]
         end
     end
@@ -413,32 +411,6 @@ flowchart TB
 ---
 
 ## Models
-
-### LightSource
-
-```mermaid
-classDiagram
-    class LightSource {
-        +string Name
-        +LightType Type
-        +Color Color
-        +double Intensity
-        +Vector3 Position
-        +Vector3 Direction
-        +double SpotAngle
-        +bool IsEnabled
-    }
-    
-    class LightType {
-        <<enumeration>>
-        Directional
-        Point
-        Spot
-        Ambient
-    }
-    
-    LightSource --> LightType
-```
 
 ### ObjectColor
 

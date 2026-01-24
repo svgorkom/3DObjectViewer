@@ -14,7 +14,6 @@
 | **Batch Drop** | Drop multiple objects simultaneously (1-20 at once) |
 | **Physics Simulation** | Objects fall under gravity, collide with each other and boundaries, and come to rest naturally |
 | **Object Manipulation** | Select objects, drag to move them, adjust position/rotation/scale via sliders |
-| **Dynamic Lighting** | Multiple light sources with adjustable position, direction, color, and brightness |
 | **Performance Monitoring** | Real-time display of FPS, frame time, object count, triangle count, and memory usage |
 
 ### Target Framework
@@ -105,13 +104,11 @@ graph TB
             VM1[MainViewModel.cs]
             VM2[ObjectsViewModel.cs]
             VM3[SelectionViewModel.cs]
-            VM4[LightingViewModel.cs]
             VM5[PerformanceStatsViewModel.cs]
         end
         
         subgraph "Views/Controls/"
             V1[ObjectControlPanel.xaml]
-            V2[LightingControlPanel.xaml]
         end
         
         subgraph "Rendering/"
@@ -120,19 +117,12 @@ graph TB
                 R2[HelixSceneObject.cs]
                 R3[HelixSceneObjects.cs]
             end
-            subgraph "Services/"
-                RS1[LightingService.cs]
-            end
             R4[RendererManager.cs]
             R5[RendererFactory.cs]
         end
         
         subgraph "Physics/"
             P1[PhysicsHelper.cs]
-        end
-        
-        subgraph "Services/"
-            S1[SceneService.cs]
         end
         
         MW[MainWindow.xaml]
@@ -152,7 +142,6 @@ flowchart TB
     subgraph Presentation["PRESENTATION LAYER"]
         MW[MainWindow<br/>XAML + C#]
         OCP[ObjectControlPanel<br/>XAML]
-        LCP[LightingControlPanel<br/>XAML]
     end
     
     subgraph ViewModel["VIEWMODEL LAYER"]
@@ -160,7 +149,6 @@ flowchart TB
         subgraph ChildVMs["Child ViewModels"]
             OVM[ObjectsViewModel<br/>• AddCubeCommand<br/>• DropCount<br/>• ObjectSize<br/>• SelectedColor]
             SVM[SelectionViewModel<br/>• SelectedObject<br/>• Position X/Y/Z<br/>• Scale]
-            LVM[LightingViewModel<br/>• LightSources<br/>• SelectedLight<br/>• Color, Intensity]
         end
         PSVM[PerformanceStatsViewModel<br/>• FPS, FrameTime<br/>• ObjectCount, Triangles<br/>• Memory, Camera]
     end
@@ -169,8 +157,6 @@ flowchart TB
         RM[RendererManager]
         IR[IRenderer]
         HWR[HelixWpfRenderer]
-        SS[SceneService]
-        LS[LightingService]
     end
     
     subgraph Physics["PHYSICS LAYER"]
@@ -180,17 +166,14 @@ flowchart TB
     
     MW -->|DataContext| MVM
     OCP -->|Bindings| OVM
-    LCP -->|Bindings| LVM
     
     MVM --> OVM
     MVM --> SVM
-    MVM --> LVM
     MVM --> PSVM
     
     MVM --> RM
     RM --> IR
     IR --> HWR
-    SS --> LS
     
     MVM --> PE
     MVM --> PH
@@ -212,20 +195,18 @@ graph LR
     
     subgraph Model["Model Layer"]
         M1[RigidBody]
-        M2[LightSource]
     end
     
     V1 <-->|Data Binding| VM1
     V2 <-->|Data Binding| VM2
     VM1 -->|Reads/Writes| M1
-    VM2 -->|Reads/Writes| M2
 ```
 
 | Layer | Components | Responsibilities |
 |-------|------------|------------------|
 | **View** | MainWindow, Control Panels | UI layout, user input, data binding |
 | **ViewModel** | MainViewModel + child VMs | Business logic, state management, commands |
-| **Model** | RigidBody, LightSource | Data structures, physics state |
+| **Model** | RigidBody | Data structures, physics state |
 
 ---
 
@@ -238,7 +219,6 @@ classDiagram
     class MainViewModel {
         +ObjectsViewModel Objects
         +SelectionViewModel Selection
-        +LightingViewModel Lighting
         +PerformanceStatsViewModel PerformanceStats
         +bool PhysicsEnabled
         +double Gravity
@@ -273,12 +253,6 @@ classDiagram
         +double SelectedObjectRotationZ
     }
     
-    class LightingViewModel {
-        +ObservableCollection~LightSource~ LightSources
-        +LightSource SelectedLight
-        +double AmbientIntensity
-    }
-    
     class PerformanceStatsViewModel {
         +double FPS
         +double FrameTime
@@ -291,7 +265,6 @@ classDiagram
     
     MainViewModel *-- ObjectsViewModel
     MainViewModel *-- SelectionViewModel
-    MainViewModel *-- LightingViewModel
     MainViewModel *-- PerformanceStatsViewModel
 ```
 
@@ -311,10 +284,9 @@ The root ViewModel that orchestrates all child ViewModels and services.
 |----------|------|-------------|
 | `Objects` | `ObjectsViewModel` | Object creation settings |
 | `Selection` | `SelectionViewModel` | Selected object manipulation |
-| `Lighting` | `LightingViewModel` | Light source management |
 | `PerformanceStats` | `PerformanceStatsViewModel` | Real-time statistics |
 | `PhysicsEnabled` | `bool` | Toggle physics simulation |
-| `Gravity` | `double` | Gravity strength (m/s^2) |
+| `Gravity` | `double` | Gravity strength (m/s²) |
 | `SceneObjects` | `ObservableCollection<Visual3D>` | All 3D objects in scene |
 
 **Commands:**
@@ -370,18 +342,6 @@ Handles selected object manipulation.
 | `SelectionChanged` | Selection changed (update highlight) |
 | `ObjectDeleted` | Object was deleted (cleanup physics) |
 | `ObjectMoved` | Object position changed (sync physics) |
-
-### LightingViewModel
-
-Manages scene lighting configuration.
-
-**Key Properties:**
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `LightSources` | `ObservableCollection<LightSource>` | All lights |
-| `SelectedLight` | `LightSource?` | Light being edited |
-| `AmbientIntensity` | `double` | Ambient light level |
 
 ### PerformanceStatsViewModel
 
@@ -579,6 +539,15 @@ flowchart TB
         end
         
         subgraph Content["Content Area"]
+            subgraph ControlPanel["Control Panel"]
+                AddObj[Add Objects]
+                Settings[Settings]
+                Physics[Physics]
+                Selected[Selected Object]
+                SceneCtrl[Scene]
+                Help[Help]
+            end
+            
             subgraph Viewport["3D Viewport (HelixViewport3D)"]
                 Scene[3D Scene]
                 subgraph Stats["Performance Stats"]
@@ -587,15 +556,6 @@ flowchart TB
                     Objects[Objects: 25]
                     Tris[Tris: 12.5k]
                 end
-            end
-            
-            subgraph ControlPanel["Control Panel"]
-                AddObj[Add Objects]
-                Settings[Settings]
-                Physics[Physics]
-                Selected[Selected Object]
-                SceneCtrl[Scene]
-                Help[Help]
             end
         end
     end
@@ -664,51 +624,6 @@ flowchart LR
 
 ---
 
-## Services
-
-### Service Architecture
-
-```mermaid
-classDiagram
-    class SceneService {
-        +LightingService Lighting
-        +UpdateAllLights(IEnumerable~LightSource~ sources)
-    }
-    
-    class LightingService {
-        +CreateDirectionalLight()
-        +CreatePointLight()
-        +CreateSpotLight()
-        +UpdateLightProperties()
-        +ManageLampVisuals()
-    }
-    
-    SceneService *-- LightingService
-```
-
-### SceneService
-
-Facade that coordinates scene-related services:
-
-```csharp
-public class SceneService
-{
-    public LightingService Lighting { get; }
-    
-    public void UpdateAllLights(IEnumerable<LightSource> sources);
-}
-```
-
-### LightingService
-
-Manages light visuals in the 3D scene:
-
-- Creates DirectionalLight, PointLight, SpotLight instances
-- Updates light properties when ViewModel changes
-- Manages lamp fixture visuals
-
----
-
 ## Dependencies
 
 ```mermaid
@@ -748,7 +663,6 @@ classDiagram
     class MainViewModel {
         +ObjectsViewModel Objects
         +SelectionViewModel Selection
-        +LightingViewModel Lighting
     }
     
     class ViewModelBase {
@@ -759,11 +673,9 @@ classDiagram
     ViewModelBase <|-- MainViewModel
     ViewModelBase <|-- ObjectsViewModel
     ViewModelBase <|-- SelectionViewModel
-    ViewModelBase <|-- LightingViewModel
     
     MainViewModel *-- ObjectsViewModel
     MainViewModel *-- SelectionViewModel
-    MainViewModel *-- LightingViewModel
 ```
 
 **Decision:** MainViewModel composes child ViewModels rather than inheriting.
