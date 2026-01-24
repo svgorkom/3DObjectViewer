@@ -16,41 +16,41 @@ namespace _3DObjectViewer;
 /// <remarks>
 /// <para>
 /// This window serves as the View in the MVVM pattern, coordinating between
-/// the ViewModel and the 3D viewport.
+/// the ViewModel and the 3D viewports.
 /// </para>
 /// <para>
-/// The window handles view-specific concerns that cannot be easily moved to ViewModels:
-/// </para>
+/// The window provides three synchronized viewports:
 /// <list type="bullet">
-///   <item><description>Mouse hit-testing and drag operations (requires viewport access)</description></item>
-///   <item><description>Selection box visual updates (requires Visual3D manipulation)</description></item>
-///   <item><description>CompositionTarget.Rendering timing (UI thread requirement)</description></item>
-///   <item><description>Triangle counting (requires traversing visual tree)</description></item>
+///   <item><description>Main viewport: Perspective view with full camera control</description></item>
+///   <item><description>Top viewport: Orthographic view looking down the Z-axis</description></item>
+///   <item><description>Sagittal viewport: Orthographic side view looking along the X-axis</description></item>
 /// </list>
-/// <para>
-/// Performance statistics are managed by <see cref="PerformanceStatsViewModel"/> and
-/// displayed via data binding, with timing logic remaining in the View.
 /// </para>
 /// </remarks>
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private readonly BoundingBoxVisual3D _selectionBox;
+    private readonly BoundingBoxVisual3D _selectionBoxTop;
+    private readonly BoundingBoxVisual3D _selectionBoxSagittal;
     private readonly ModelVisual3D _terrainVisual;
+    
+    // Mapping from main viewport objects to their clones in secondary viewports
+    private readonly Dictionary<Visual3D, Visual3D> _topViewClones = [];
+    private readonly Dictionary<Visual3D, Visual3D> _sagittalViewClones = [];
     
     private bool _isDragging;
     private Point _lastMousePosition;
     private Point3D _dragStartPosition;
     private DragPlane3D? _dragPlane;
 
-    // FPS timing fields (kept in View for CompositionTarget.Rendering access)
+    // FPS timing fields
     private readonly Stopwatch _fpsStopwatch = new();
     private int _frameCount;
     private TimeSpan _lastFpsUpdate;
     private TimeSpan _lastStatsUpdate;
     private const double StatsUpdateIntervalMs = 250;
     
-    // Triangle count caching (expensive to calculate)
     private int _cachedTriangleCount;
     private int _lastObjectCount = 0;
 
@@ -64,15 +64,29 @@ public partial class MainWindow : Window
         _viewModel = new MainViewModel();
         DataContext = _viewModel;
 
-        // Create selection box indicator
+        // Create selection box indicators for all viewports
         _selectionBox = new BoundingBoxVisual3D 
         { 
             Diameter = 0.05,
             Transform = Transform3D.Identity
         };
         HelixViewport.Children.Add(_selectionBox);
+        
+        _selectionBoxTop = new BoundingBoxVisual3D 
+        { 
+            Diameter = 0.03,
+            Transform = Transform3D.Identity
+        };
+        TopViewport.Children.Add(_selectionBoxTop);
+        
+        _selectionBoxSagittal = new BoundingBoxVisual3D 
+        { 
+            Diameter = 0.03,
+            Transform = Transform3D.Identity
+        };
+        SagittalViewport.Children.Add(_selectionBoxSagittal);
 
-        // Create terrain with gentle hills
+        // Create terrain
         _terrainVisual = CreateTerrainVisual();
         HelixViewport.Children.Add(_terrainVisual);
 
@@ -82,14 +96,11 @@ public partial class MainWindow : Window
         _viewModel.SelectionChanged += OnSelectionChanged;
         _viewModel.PhysicsUpdated += OnPhysicsUpdated;
 
-        // Handle keyboard input
         KeyDown += OnKeyDown;
 
-        // Start FPS counter and statistics
         _fpsStopwatch.Start();
         CompositionTarget.Rendering += OnCompositionTargetRendering;
         
-        // Ensure cleanup when window closes
         Closed += OnWindowClosed;
     }
 
@@ -98,14 +109,10 @@ public partial class MainWindow : Window
     /// <summary>
     /// Creates a flat terrain visual matching the physics ground plane.
     /// </summary>
-    /// <remarks>
-    /// The terrain is kept flat to match the physics simulation which uses a flat ground plane.
-    /// The visual terrain is at Z=0 to align with the physics ground surface.
-    /// </remarks>
     private static ModelVisual3D CreateTerrainVisual()
     {
-        const int resolution = 40; // Grid resolution
-        const double size = 40.0;  // Total terrain size
+        const int resolution = 40;
+        const double size = 40.0;
         const double halfSize = size / 2;
         const double step = size / resolution;
         
@@ -114,25 +121,20 @@ public partial class MainWindow : Window
         var textureCoords = new PointCollection();
         var triangleIndices = new Int32Collection();
         
-        // Generate flat height map (Z=0 everywhere to match physics ground)
-        // This ensures objects don't fall through the visual terrain
-        
-        // Generate mesh vertices
         for (int i = 0; i <= resolution; i++)
         {
             for (int j = 0; j <= resolution; j++)
             {
                 double x = -halfSize + i * step;
                 double y = -halfSize + j * step;
-                double z = 0; // Flat ground at Z=0
+                double z = 0;
                 
                 positions.Add(new Point3D(x, y, z));
                 textureCoords.Add(new Point((double)i / resolution, (double)j / resolution));
-                normals.Add(new Vector3D(0, 0, 1)); // All normals point up
+                normals.Add(new Vector3D(0, 0, 1));
             }
         }
         
-        // Generate triangle indices
         for (int i = 0; i < resolution; i++)
         {
             for (int j = 0; j < resolution; j++)
@@ -142,19 +144,16 @@ public partial class MainWindow : Window
                 int bottomLeft = (i + 1) * (resolution + 1) + j;
                 int bottomRight = bottomLeft + 1;
                 
-                // First triangle
                 triangleIndices.Add(topLeft);
                 triangleIndices.Add(bottomLeft);
                 triangleIndices.Add(topRight);
                 
-                // Second triangle
                 triangleIndices.Add(topRight);
                 triangleIndices.Add(bottomLeft);
                 triangleIndices.Add(bottomRight);
             }
         }
         
-        // Create mesh
         var mesh = new MeshGeometry3D
         {
             Positions = positions,
@@ -164,16 +163,15 @@ public partial class MainWindow : Window
         };
         mesh.Freeze();
         
-        // Create grass material with gradient for visual interest
         var grassBrush = new LinearGradientBrush
         {
             StartPoint = new Point(0, 0),
             EndPoint = new Point(1, 1)
         };
-        grassBrush.GradientStops.Add(new GradientStop(Color.FromRgb(74, 124, 47), 0));    // Dark grass
-        grassBrush.GradientStops.Add(new GradientStop(Color.FromRgb(93, 138, 58), 0.3));  // Medium grass
-        grassBrush.GradientStops.Add(new GradientStop(Color.FromRgb(61, 107, 37), 0.7));  // Darker grass
-        grassBrush.GradientStops.Add(new GradientStop(Color.FromRgb(74, 124, 47), 1));    // Dark grass
+        grassBrush.GradientStops.Add(new GradientStop(Color.FromRgb(74, 124, 47), 0));
+        grassBrush.GradientStops.Add(new GradientStop(Color.FromRgb(93, 138, 58), 0.3));
+        grassBrush.GradientStops.Add(new GradientStop(Color.FromRgb(61, 107, 37), 0.7));
+        grassBrush.GradientStops.Add(new GradientStop(Color.FromRgb(74, 124, 47), 1));
         grassBrush.Freeze();
         
         var material = new MaterialGroup();
@@ -184,7 +182,7 @@ public partial class MainWindow : Window
         {
             Geometry = mesh,
             Material = material,
-            BackMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(61, 40, 23))) // Brown underside
+            BackMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(61, 40, 23)))
         };
         geometry.Freeze();
         
@@ -193,42 +191,196 @@ public partial class MainWindow : Window
 
     #endregion
 
+    #region Secondary Viewport Synchronization
+
     /// <summary>
-    /// Cleans up event subscriptions when the window is closed to prevent memory leaks.
+    /// Creates a simplified clone of a Visual3D for secondary viewports.
     /// </summary>
+    /// <remarks>
+    /// The clones are created with geometry centered at the origin, matching how
+    /// the physics system normalizes objects. Position is controlled via Transform.
+    /// </remarks>
+    /// <param name="original">The original visual to clone.</param>
+    /// <returns>A simplified visual that mirrors the original.</returns>
+    private static Visual3D? CreateVisualClone(Visual3D original)
+    {
+        // Create clones with geometry at origin - position is controlled via Transform
+        // This matches how PhysicsHelper normalizes the originals
+        return original switch
+        {
+            BoxVisual3D box => new BoxVisual3D
+            {
+                Width = box.Width,
+                Height = box.Height,
+                Length = box.Length,
+                Center = new Point3D(0, 0, 0), // Centered at origin
+                Material = box.Material,
+                Transform = box.Transform
+            },
+            SphereVisual3D sphere => new SphereVisual3D
+            {
+                Radius = sphere.Radius,
+                Center = new Point3D(0, 0, 0), // Centered at origin
+                Material = sphere.Material,
+                Transform = sphere.Transform
+            },
+            PipeVisual3D pipe => new PipeVisual3D
+            {
+                Diameter = pipe.Diameter,
+                InnerDiameter = pipe.InnerDiameter,
+                Point1 = pipe.Point1, // Keep relative points (already normalized by physics)
+                Point2 = pipe.Point2,
+                Material = pipe.Material,
+                Transform = pipe.Transform
+            },
+            TruncatedConeVisual3D cone => new TruncatedConeVisual3D
+            {
+                BaseRadius = cone.BaseRadius,
+                TopRadius = cone.TopRadius,
+                Height = cone.Height,
+                Origin = cone.Origin, // Keep relative origin (already normalized by physics)
+                Material = cone.Material,
+                Transform = cone.Transform
+            },
+            TorusVisual3D torus => new TorusVisual3D
+            {
+                TorusDiameter = torus.TorusDiameter,
+                TubeDiameter = torus.TubeDiameter,
+                Material = torus.Material,
+                Transform = torus.Transform
+            },
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Updates the transform of cloned visuals to match the original.
+    /// </summary>
+    private void SyncCloneTransforms()
+    {
+        foreach (var (original, clone) in _topViewClones)
+        {
+            SyncVisualState(original, clone);
+        }
+        
+        foreach (var (original, clone) in _sagittalViewClones)
+        {
+            SyncVisualState(original, clone);
+        }
+    }
+    
+    /// <summary>
+    /// Synchronizes all relevant state from original to clone.
+    /// </summary>
+    private static void SyncVisualState(Visual3D original, Visual3D clone)
+    {
+        // Always sync the transform
+        clone.Transform = original.Transform;
+        
+        // For some types, also sync geometry properties that might have changed
+        switch (original, clone)
+        {
+            case (BoxVisual3D origBox, BoxVisual3D cloneBox):
+                cloneBox.Center = origBox.Center;
+                break;
+            case (SphereVisual3D origSphere, SphereVisual3D cloneSphere):
+                cloneSphere.Center = origSphere.Center;
+                break;
+            case (PipeVisual3D origPipe, PipeVisual3D clonePipe):
+                clonePipe.Point1 = origPipe.Point1;
+                clonePipe.Point2 = origPipe.Point2;
+                break;
+            case (TruncatedConeVisual3D origCone, TruncatedConeVisual3D cloneCone):
+                cloneCone.Origin = origCone.Origin;
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Adds a visual to the secondary viewports.
+    /// </summary>
+    private void AddToSecondaryViewports(Visual3D visual)
+    {
+        var topClone = CreateVisualClone(visual);
+        if (topClone is not null)
+        {
+            // Immediately sync state to ensure clone matches current state
+            SyncVisualState(visual, topClone);
+            _topViewClones[visual] = topClone;
+            TopViewport.Children.Add(topClone);
+        }
+        
+        var sagittalClone = CreateVisualClone(visual);
+        if (sagittalClone is not null)
+        {
+            // Immediately sync state to ensure clone matches current state
+            SyncVisualState(visual, sagittalClone);
+            _sagittalViewClones[visual] = sagittalClone;
+            SagittalViewport.Children.Add(sagittalClone);
+        }
+    }
+
+    /// <summary>
+    /// Removes a visual from the secondary viewports.
+    /// </summary>
+    private void RemoveFromSecondaryViewports(Visual3D visual)
+    {
+        if (_topViewClones.TryGetValue(visual, out var topClone))
+        {
+            TopViewport.Children.Remove(topClone);
+            _topViewClones.Remove(visual);
+        }
+        
+        if (_sagittalViewClones.TryGetValue(visual, out var sagittalClone))
+        {
+            SagittalViewport.Children.Remove(sagittalClone);
+            _sagittalViewClones.Remove(visual);
+        }
+    }
+
+    /// <summary>
+    /// Clears all clones from secondary viewports.
+    /// </summary>
+    private void ClearSecondaryViewports()
+    {
+        foreach (var clone in _topViewClones.Values)
+        {
+            TopViewport.Children.Remove(clone);
+        }
+        _topViewClones.Clear();
+        
+        foreach (var clone in _sagittalViewClones.Values)
+        {
+            SagittalViewport.Children.Remove(clone);
+        }
+        _sagittalViewClones.Clear();
+    }
+
+    #endregion
+
     private void OnWindowClosed(object? sender, EventArgs e)
     {
-        // Unsubscribe from CompositionTarget.Rendering to prevent memory leak
         CompositionTarget.Rendering -= OnCompositionTargetRendering;
         
-        // Unsubscribe from ViewModel events
         _viewModel.ResetCameraRequested -= OnResetCameraRequested;
         _viewModel.SceneObjects.CollectionChanged -= OnSceneObjectsChanged;
         _viewModel.SelectionChanged -= OnSelectionChanged;
         _viewModel.PhysicsUpdated -= OnPhysicsUpdated;
         
-        // Stop physics engine
         _viewModel.PhysicsEngine.Stop();
-        
-        // Stop stopwatch
         _fpsStopwatch.Stop();
     }
 
     #region Performance Statistics
 
-    /// <summary>
-    /// Handles the CompositionTarget.Rendering event to calculate FPS and update statistics.
-    /// </summary>
-    /// <remarks>
-    /// This method runs on every frame render and delegates to the PerformanceStatsViewModel
-    /// for display updates while keeping timing logic in the View.
-    /// </remarks>
     private void OnCompositionTargetRendering(object? sender, EventArgs e)
     {
         _frameCount++;
         var elapsed = _fpsStopwatch.Elapsed;
 
-        // Update FPS display every 500ms for stable readings
+        // Sync clone transforms every frame for smooth secondary viewport updates
+        SyncCloneTransforms();
+
         if ((elapsed - _lastFpsUpdate).TotalMilliseconds >= 500)
         {
             var deltaSeconds = (elapsed - _lastFpsUpdate).TotalSeconds;
@@ -241,7 +393,6 @@ public partial class MainWindow : Window
             _lastFpsUpdate = elapsed;
         }
 
-        // Update other statistics less frequently
         if ((elapsed - _lastStatsUpdate).TotalMilliseconds >= StatsUpdateIntervalMs)
         {
             UpdateStatistics();
@@ -249,14 +400,10 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>
-    /// Collects and updates scene statistics via the PerformanceStatsViewModel.
-    /// </summary>
     private void UpdateStatistics()
     {
         var objectCount = _viewModel.SceneObjects.Count;
         
-        // Only recalculate triangles if object count changed (expensive operation)
         if (objectCount != _lastObjectCount)
         {
             _cachedTriangleCount = CountTriangles();
@@ -277,27 +424,16 @@ public partial class MainWindow : Window
         _viewModel.PerformanceStats.UpdateCameraPosition(camPos.X, camPos.Y, camPos.Z);
     }
 
-    /// <summary>
-    /// Counts the total number of triangles in all scene objects.
-    /// </summary>
-    /// <returns>The total triangle count.</returns>
     private int CountTriangles()
     {
         int totalTriangles = 0;
-
         foreach (var visual in _viewModel.SceneObjects)
         {
             totalTriangles += CountTrianglesInVisual(visual);
         }
-
         return totalTriangles;
     }
 
-    /// <summary>
-    /// Recursively counts triangles in a Visual3D and its children.
-    /// </summary>
-    /// <param name="visual">The visual to count triangles in.</param>
-    /// <returns>The triangle count for this visual and its descendants.</returns>
     private static int CountTrianglesInVisual(Visual3D visual)
     {
         int count = 0;
@@ -319,7 +455,6 @@ public partial class MainWindow : Window
             }
         }
 
-        // Check children
         int childCount = VisualTreeHelper.GetChildrenCount(visual);
         for (int i = 0; i < childCount; i++)
         {
@@ -332,11 +467,6 @@ public partial class MainWindow : Window
         return count;
     }
 
-    /// <summary>
-    /// Counts triangles in a Model3D, recursively processing Model3DGroups.
-    /// </summary>
-    /// <param name="model">The model to count triangles in.</param>
-    /// <returns>The triangle count for this model.</returns>
     private static int CountTrianglesInModel(Model3D model)
     {
         int count = 0;
@@ -384,7 +514,6 @@ public partial class MainWindow : Window
         }
         else if (e.Key == Key.Space)
         {
-            // Toggle physics with spacebar
             _viewModel.TogglePhysicsCommand.Execute(null);
             e.Handled = true;
         }
@@ -404,7 +533,6 @@ public partial class MainWindow : Window
         }
         catch (ArgumentException)
         {
-            // Handle case where a Visual3D has null transform
             return;
         }
 
@@ -471,7 +599,9 @@ public partial class MainWindow : Window
 
     private void OnPhysicsUpdated()
     {
-        // Update selection box if selected object is moving
+        // Sync transforms to secondary viewports
+        SyncCloneTransforms();
+        
         if (_viewModel.Selection.HasSelection)
         {
             UpdateSelectionBox();
@@ -488,6 +618,7 @@ public partial class MainWindow : Window
                     foreach (Visual3D item in e.NewItems)
                     {
                         HelixViewport.Children.Add(item);
+                        AddToSecondaryViewports(item);
                     }
                 }
                 break;
@@ -498,14 +629,12 @@ public partial class MainWindow : Window
                     foreach (Visual3D item in e.OldItems)
                     {
                         HelixViewport.Children.Remove(item);
+                        RemoveFromSecondaryViewports(item);
                     }
                 }
                 break;
 
             case NotifyCollectionChangedAction.Reset:
-                // Only remove user-created objects, not scene infrastructure
-                // (GridLinesVisual3D, RectangleVisual3D, CoordinateSystemVisual3D, etc.)
-                // We identify user objects as specific primitive types that we create
                 var itemsToRemove = HelixViewport.Children
                     .OfType<Visual3D>()
                     .Where(IsUserCreatedObject)
@@ -515,6 +644,8 @@ public partial class MainWindow : Window
                 {
                     HelixViewport.Children.Remove(item);
                 }
+                
+                ClearSecondaryViewports();
                 break;
         }
     }
@@ -565,6 +696,8 @@ public partial class MainWindow : Window
         if (_viewModel.Selection.SelectedObject is null)
         {
             _selectionBox.BoundingBox = Rect3D.Empty;
+            _selectionBoxTop.BoundingBox = Rect3D.Empty;
+            _selectionBoxSagittal.BoundingBox = Rect3D.Empty;
             return;
         }
 
@@ -578,18 +711,15 @@ public partial class MainWindow : Window
                 bounds.SizeX + 0.2,
                 bounds.SizeY + 0.2,
                 bounds.SizeZ + 0.2);
+            
             _selectionBox.BoundingBox = expandedBounds;
+            _selectionBoxTop.BoundingBox = expandedBounds;
+            _selectionBoxSagittal.BoundingBox = expandedBounds;
         }
     }
 
-    /// <summary>
-    /// Determines if a Visual3D is a user-created object (not scene infrastructure).
-    /// </summary>
-    /// <param name="visual">The visual to check.</param>
-    /// <returns>True if the visual is a user-created object; otherwise, false.</returns>
     private static bool IsUserCreatedObject(Visual3D visual)
     {
-        // User-created objects are the specific primitive types we add via ObjectsViewModel
         return visual is BoxVisual3D 
             or SphereVisual3D 
             or PipeVisual3D 
