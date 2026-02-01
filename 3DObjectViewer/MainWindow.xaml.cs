@@ -49,6 +49,9 @@ public partial class MainWindow : Window
     private readonly Dictionary<Visual3D, ModelVisual3D> _topViewModels = [];
     private readonly Dictionary<Visual3D, ModelVisual3D> _sagittalViewModels = [];
     
+    // Cache for last synced transforms to avoid unnecessary WPF property updates
+    private readonly Dictionary<Visual3D, Transform3D> _lastSyncedTransforms = [];
+    
     private bool _isDragging;
     private Point _lastMousePosition;
     private Point3D _dragStartPosition;
@@ -224,7 +227,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Synchronizes the transforms of secondary viewport models with their originals.
-    /// Only syncs if the dirty flag is set to avoid unnecessary work.
+    /// Only syncs if the dirty flag is set and transforms have actually changed.
     /// </summary>
     private void SyncSecondaryViewportTransforms()
     {
@@ -234,15 +237,28 @@ public partial class MainWindow : Window
             
         _secondaryViewportsDirty = false;
 
-        // Batch updates - iterate once through both dictionaries
-        foreach (var (original, modelVisual) in _topViewModels)
+        // Sync transforms only when they've actually changed
+        foreach (var (original, topModelVisual) in _topViewModels)
         {
-            modelVisual.Transform = original.Transform;
-        }
-        
-        foreach (var (original, modelVisual) in _sagittalViewModels)
-        {
-            modelVisual.Transform = original.Transform;
+            var currentTransform = original.Transform;
+            
+            // Fast path: check if transform reference is the same as last synced
+            if (_lastSyncedTransforms.TryGetValue(original, out var lastTransform) &&
+                ReferenceEquals(currentTransform, lastTransform))
+            {
+                continue;
+            }
+            
+            // Transform has changed - update both secondary viewports
+            topModelVisual.Transform = currentTransform;
+            
+            if (_sagittalViewModels.TryGetValue(original, out var sagittalModelVisual))
+            {
+                sagittalModelVisual.Transform = currentTransform;
+            }
+            
+            // Cache the new transform
+            _lastSyncedTransforms[original] = currentTransform;
         }
     }
 
@@ -254,10 +270,12 @@ public partial class MainWindow : Window
         var model = ExtractModel(visual);
         if (model is null) return;
         
+        var transform = visual.Transform;
+        
         var topModelVisual = new ModelVisual3D
         {
             Content = model,
-            Transform = visual.Transform
+            Transform = transform
         };
         _topViewModels[visual] = topModelVisual;
         TopViewport.Children.Add(topModelVisual);
@@ -265,10 +283,13 @@ public partial class MainWindow : Window
         var sagittalModelVisual = new ModelVisual3D
         {
             Content = model,
-            Transform = visual.Transform
+            Transform = transform
         };
         _sagittalViewModels[visual] = sagittalModelVisual;
         SagittalViewport.Children.Add(sagittalModelVisual);
+        
+        // Cache the initial transform
+        _lastSyncedTransforms[visual] = transform;
     }
 
     /// <summary>
@@ -279,14 +300,23 @@ public partial class MainWindow : Window
         if (_topViewModels.TryGetValue(visual, out var topModel))
         {
             TopViewport.Children.Remove(topModel);
+            // Clear the Content reference to break the link to shared Model3D geometry
+            topModel.Content = null;
+            topModel.Transform = null;
             _topViewModels.Remove(visual);
         }
         
         if (_sagittalViewModels.TryGetValue(visual, out var sagittalModel))
         {
             SagittalViewport.Children.Remove(sagittalModel);
+            // Clear the Content reference to break the link to shared Model3D geometry
+            sagittalModel.Content = null;
+            sagittalModel.Transform = null;
             _sagittalViewModels.Remove(visual);
         }
+        
+        // Clean up cached transform
+        _lastSyncedTransforms.Remove(visual);
     }
 
     /// <summary>
@@ -297,14 +327,23 @@ public partial class MainWindow : Window
         foreach (var model in _topViewModels.Values)
         {
             TopViewport.Children.Remove(model);
+            // Clear content references to allow garbage collection
+            model.Content = null;
+            model.Transform = null;
         }
         _topViewModels.Clear();
         
         foreach (var model in _sagittalViewModels.Values)
         {
             SagittalViewport.Children.Remove(model);
+            // Clear content references to allow garbage collection
+            model.Content = null;
+            model.Transform = null;
         }
         _sagittalViewModels.Clear();
+        
+        // Clear cached transforms
+        _lastSyncedTransforms.Clear();
     }
 
     #endregion

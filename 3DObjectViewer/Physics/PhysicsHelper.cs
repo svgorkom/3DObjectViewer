@@ -22,6 +22,10 @@ namespace _3DObjectViewer.Physics;
 /// mesh regeneration in HelixToolkit. This class uses Transform3D for position updates
 /// to avoid this expensive operation.
 /// </para>
+/// <para>
+/// <b>Memory optimization:</b> Transform3D objects are cached and reused per body to avoid
+/// allocating new objects every physics frame.
+/// </para>
 /// </remarks>
 public static class PhysicsHelper
 {
@@ -30,6 +34,15 @@ public static class PhysicsHelper
     
     // Track which visuals have been normalized (moved to origin for transform-based updates)
     private static readonly HashSet<Guid> _normalizedVisuals = [];
+    
+    // Cache for reusable TranslateTransform3D objects (for translation-only updates)
+    private static readonly Dictionary<Guid, TranslateTransform3D> _translateTransformCache = [];
+    
+    // Cache for reusable MatrixTransform3D objects (for rotation + translation updates)
+    private static readonly Dictionary<Guid, MatrixTransform3D> _matrixTransformCache = [];
+    
+    // Track last rotation state to avoid switching transform types unnecessarily
+    private static readonly Dictionary<Guid, bool> _lastHadRotation = [];
 
     /// <summary>
     /// Creates a rigid body from a Visual3D object.
@@ -48,6 +61,11 @@ public static class PhysicsHelper
 
         // Cache the visual for transform updates
         _bodyToVisual[bodyId] = visual;
+        
+        // Pre-create cached transforms for this body
+        _translateTransformCache[bodyId] = new TranslateTransform3D(position.X, position.Y, position.Z);
+        _matrixTransformCache[bodyId] = new MatrixTransform3D();
+        _lastHadRotation[bodyId] = false;
 
         // Normalize the visual immediately (move to origin, use transform for position)
         NormalizeVisual(bodyId, visual, position, height);
@@ -56,21 +74,104 @@ public static class PhysicsHelper
     }
 
     /// <summary>
-    /// Removes the cached visual reference for a body.
+    /// Removes the cached visual reference for a body and disposes the visual's geometry.
     /// </summary>
     public static void RemoveVisualCache(Guid bodyId)
     {
-        _bodyToVisual.Remove(bodyId);
+        if (_bodyToVisual.TryGetValue(bodyId, out var visual))
+        {
+            DisposeVisualGeometry(visual);
+            _bodyToVisual.Remove(bodyId);
+        }
         _normalizedVisuals.Remove(bodyId);
+        _translateTransformCache.Remove(bodyId);
+        _matrixTransformCache.Remove(bodyId);
+        _lastHadRotation.Remove(bodyId);
     }
 
     /// <summary>
-    /// Clears all cached visual references.
+    /// Clears all cached visual references and disposes their geometry.
     /// </summary>
     public static void ClearVisualCache()
     {
+        foreach (var visual in _bodyToVisual.Values)
+        {
+            DisposeVisualGeometry(visual);
+        }
         _bodyToVisual.Clear();
         _normalizedVisuals.Clear();
+        _translateTransformCache.Clear();
+        _matrixTransformCache.Clear();
+        _lastHadRotation.Clear();
+    }
+
+    /// <summary>
+    /// Disposes the geometry data of a Visual3D to free memory.
+    /// This clears the internal MeshGeometry3D collections (Positions, TriangleIndices, etc.)
+    /// which can hold large arrays that are not automatically garbage collected.
+    /// </summary>
+    /// <param name="visual">The Visual3D to dispose.</param>
+    public static void DisposeVisualGeometry(Visual3D visual)
+    {
+        if (visual is MeshElement3D meshElement)
+        {
+            // Get the underlying Model3D and clear its geometry
+            var model = meshElement.Model;
+            if (model is GeometryModel3D geometryModel)
+            {
+                ClearMeshGeometry(geometryModel.Geometry as MeshGeometry3D);
+                
+                // Clear material references
+                geometryModel.Material = null;
+                geometryModel.BackMaterial = null;
+            }
+        }
+        else if (visual is ModelVisual3D modelVisual)
+        {
+            ClearModel3D(modelVisual.Content);
+            modelVisual.Content = null;
+        }
+        
+        // Clear the transform to release any references
+        visual.Transform = null;
+    }
+
+    /// <summary>
+    /// Recursively clears a Model3D and its children.
+    /// </summary>
+    private static void ClearModel3D(Model3D? model)
+    {
+        if (model is null) return;
+
+        if (model is GeometryModel3D geometryModel)
+        {
+            ClearMeshGeometry(geometryModel.Geometry as MeshGeometry3D);
+            geometryModel.Material = null;
+            geometryModel.BackMaterial = null;
+        }
+        else if (model is Model3DGroup group)
+        {
+            foreach (var child in group.Children)
+            {
+                ClearModel3D(child);
+            }
+            group.Children.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Clears the collections in a MeshGeometry3D to free memory.
+    /// </summary>
+    private static void ClearMeshGeometry(MeshGeometry3D? mesh)
+    {
+        if (mesh is null || mesh.IsFrozen) return;
+
+        // Clear all the large collections that hold geometry data
+        // These are the Point3D[], Int32[], and Point[] arrays identified by the profiler
+        mesh.Positions?.Clear();
+        mesh.TriangleIndices?.Clear();
+        mesh.Normals?.Clear();
+        mesh.TextureCoordinates?.Clear();
     }
 
     /// <summary>
@@ -166,13 +267,24 @@ public static class PhysicsHelper
                 break;
         }
 
-        // Apply initial transform
-        visual.Transform = new TranslateTransform3D(position.X, position.Y, position.Z);
+        // Apply initial transform using cached transform
+        if (_translateTransformCache.TryGetValue(bodyId, out var translateTransform))
+        {
+            translateTransform.OffsetX = position.X;
+            translateTransform.OffsetY = position.Y;
+            translateTransform.OffsetZ = position.Z;
+            visual.Transform = translateTransform;
+        }
+        else
+        {
+            visual.Transform = new TranslateTransform3D(position.X, position.Y, position.Z);
+        }
         _normalizedVisuals.Add(bodyId);
     }
 
     /// <summary>
     /// Updates the visual transform based on rigid body state.
+    /// Uses cached transform objects to avoid allocations.
     /// </summary>
     /// <param name="body">The rigid body with updated position and orientation.</param>
     public static void ApplyTransformToVisual(RigidBody body)
@@ -183,26 +295,45 @@ public static class PhysicsHelper
         var position = body.Position;
         var orientation = body.Orientation;
         bool hasRotation = !IsIdentityQuaternion(orientation);
+        
+        // Check if we had rotation last frame to determine if we need to switch transform types
+        bool lastHadRotation = _lastHadRotation.GetValueOrDefault(body.Id, false);
 
-        // All visuals are normalized at creation, so we just update the transform
-        visual.Transform = CreateTransform(position, orientation, hasRotation);
-    }
-
-    /// <summary>
-    /// Creates a combined rotation and translation transform.
-    /// </summary>
-    private static Transform3D CreateTransform(Point3D position, Quaternion orientation, bool hasRotation)
-    {
         if (!hasRotation)
         {
-            return new TranslateTransform3D(position.X, position.Y, position.Z);
+            // Use cached TranslateTransform3D - just update the offsets
+            if (_translateTransformCache.TryGetValue(body.Id, out var translateTransform))
+            {
+                translateTransform.OffsetX = position.X;
+                translateTransform.OffsetY = position.Y;
+                translateTransform.OffsetZ = position.Z;
+                
+                // Only reassign if we switched from rotation to no-rotation
+                if (lastHadRotation || visual.Transform != translateTransform)
+                {
+                    visual.Transform = translateTransform;
+                }
+            }
         }
-
-        var transformGroup = new Transform3DGroup();
-        transformGroup.Children.Add(new RotateTransform3D(new QuaternionRotation3D(orientation)));
-        transformGroup.Children.Add(new TranslateTransform3D(position.X, position.Y, position.Z));
-
-        return transformGroup;
+        else
+        {
+            // Use cached MatrixTransform3D - update the matrix in place
+            if (_matrixTransformCache.TryGetValue(body.Id, out var matrixTransform))
+            {
+                var matrix = Matrix3D.Identity;
+                matrix.Rotate(orientation);
+                matrix.Translate(new Vector3D(position.X, position.Y, position.Z));
+                matrixTransform.Matrix = matrix;
+                
+                // Only reassign if we switched from no-rotation to rotation
+                if (!lastHadRotation || visual.Transform != matrixTransform)
+                {
+                    visual.Transform = matrixTransform;
+                }
+            }
+        }
+        
+        _lastHadRotation[body.Id] = hasRotation;
     }
 
     /// <summary>

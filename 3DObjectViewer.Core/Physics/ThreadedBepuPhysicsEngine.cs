@@ -41,6 +41,7 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
     private readonly Dictionary<Guid, RigidBody> _rigidBodies = [];
     private readonly Dictionary<Guid, BodyHandle> _bodyHandles = [];
     private readonly Dictionary<BodyHandle, Guid> _handleToId = [];
+    private readonly Dictionary<Guid, TypedIndex> _shapeIndices = [];
     
     // Pending operations queue (has its own lock)
     private readonly object _operationsLock = new();
@@ -48,9 +49,12 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
     
     // Results for UI thread (no lock needed - only accessed from UI thread)
     private readonly List<RigidBody> _updatedBodies = [];
+    
+    // Pooled list for body states to avoid per-frame allocations
+    private List<BodyState> _bodyStatePool = [];
 
     // Boundary configuration
-    private readonly List<StaticHandle> _boundaryStatics = [];
+    private readonly List<(StaticHandle Handle, TypedIndex ShapeIndex)> _boundaryStatics = [];
     private volatile float _groundLevel;
     private float _bucketMinX, _bucketMaxX, _bucketMinY, _bucketMaxY, _bucketHeight;
     private volatile bool _bucketEnabled;
@@ -220,6 +224,7 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
             _rigidBodies[id] = body;
             _bodyHandles[id] = handle;
             _handleToId[handle] = id;
+            _shapeIndices[id] = shapeIndex;
         });
     }
 
@@ -235,12 +240,20 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
             if (!_bodyHandles.TryGetValue(id, out var handle))
                 return;
 
+            // Get the shape index before removing the body
+            _shapeIndices.TryGetValue(id, out var shapeIndex);
+
             if (_simulation.Bodies.BodyExists(handle))
                 _simulation.Bodies.Remove(handle);
+
+            // Remove the shape to free memory in the BufferPool
+            if (shapeIndex.Exists)
+                _simulation.Shapes.RemoveAndDispose(shapeIndex, _bufferPool);
 
             _bodyHandles.Remove(id);
             _handleToId.Remove(handle);
             _rigidBodies.Remove(id);
+            _shapeIndices.Remove(id);
         });
         return true;
     }
@@ -259,14 +272,26 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
 
     private void ClearInternal()
     {
+        // Collect all shape indices before removing bodies
+        var shapesToRemove = new List<TypedIndex>(_shapeIndices.Values);
+
         foreach (var handle in _bodyHandles.Values)
         {
             if (_simulation.Bodies.BodyExists(handle))
                 _simulation.Bodies.Remove(handle);
         }
+
+        // Remove all shapes to free memory
+        foreach (var shapeIndex in shapesToRemove)
+        {
+            if (shapeIndex.Exists)
+                _simulation.Shapes.RemoveAndDispose(shapeIndex, _bufferPool);
+        }
+
         _bodyHandles.Clear();
         _handleToId.Clear();
         _rigidBodies.Clear();
+        _shapeIndices.Clear();
     }
 
     #endregion
@@ -332,10 +357,13 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
 
     private void RebuildBoundariesInternal()
     {
-        foreach (var handle in _boundaryStatics)
+        // Remove existing boundary statics and their shapes
+        foreach (var (handle, shapeIndex) in _boundaryStatics)
         {
             if (_simulation.Statics.StaticExists(handle))
                 _simulation.Statics.Remove(handle);
+            if (shapeIndex.Exists)
+                _simulation.Shapes.RemoveAndDispose(shapeIndex, _bufferPool);
         }
         _boundaryStatics.Clear();
 
@@ -378,7 +406,7 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
         var box = new Box(sizeX, sizeY, sizeZ);
         var shapeIndex = _simulation.Shapes.Add(box);
         var handle = _simulation.Statics.Add(new StaticDescription(position, shapeIndex));
-        _boundaryStatics.Add(handle);
+        _boundaryStatics.Add((handle, shapeIndex));
     }
 
     #endregion
@@ -464,6 +492,14 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
                     RebuildBoundariesInternal();
                 }
 
+                // Skip simulation if no bodies exist - avoid idle allocations
+                if (_bodyHandles.Count == 0)
+                {
+                    lastUpdate = DateTime.UtcNow;
+                    Thread.Sleep(targetInterval);
+                    continue;
+                }
+
                 // Calculate delta time
                 var now = DateTime.UtcNow;
                 var deltaTime = (float)((now - lastUpdate).TotalSeconds * TimeScale);
@@ -472,16 +508,20 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
                 if (deltaTime > (float)PhysicsConstants.MaxDeltaTime)
                     deltaTime = (float)PhysicsConstants.MaxDeltaTime;
 
-                if (deltaTime > 0.001f && _bodyHandles.Count > 0)
+                if (deltaTime > 0.001f)
                 {
                     // Run physics simulation
                     _simulation.Timestep(deltaTime, _threadDispatcher);
                     
-                    // Collect results (snapshot of physics state)
-                    var results = CollectBodyStates();
+                    // Collect results using pooled list (avoids per-frame allocation)
+                    CollectBodyStatesPooled();
                     
-                    if (results.Count > 0)
+                    if (_bodyStatePool.Count > 0)
                     {
+                        // Swap the list to transfer ownership to UI thread
+                        var results = _bodyStatePool;
+                        _bodyStatePool = new List<BodyState>(results.Capacity);
+                        
                         // Send to UI thread - don't wait for completion
                         _uiDispatcher.BeginInvoke(DispatcherPriority.Normal, () => ApplyResults(results));
                     }
@@ -502,9 +542,19 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
         }
     }
 
-    private List<BodyState> CollectBodyStates()
+    /// <summary>
+    /// Collects body states into the pooled list to avoid per-frame allocations.
+    /// </summary>
+    private void CollectBodyStatesPooled()
     {
-        var results = new List<BodyState>(_bodyHandles.Count);
+        _bodyStatePool.Clear();
+        
+        // Ensure capacity to avoid resizing allocations
+        if (_bodyStatePool.Capacity < _bodyHandles.Count)
+        {
+            _bodyStatePool.Capacity = _bodyHandles.Count;
+        }
+        
         var groundLevel = _groundLevel;
         
         foreach (var (id, handle) in _bodyHandles)
@@ -519,7 +569,7 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
             bool isGrounded = (bodyRef.Pose.Position.Z - height * 0.5f) <= 
                 groundLevel + PhysicsConstants.GroundedThreshold;
 
-            results.Add(new BodyState(
+            _bodyStatePool.Add(new BodyState(
                 id,
                 bodyRef.Pose.Position,
                 bodyRef.Pose.Orientation,
@@ -529,8 +579,6 @@ public sealed class ThreadedBepuPhysicsEngine : IPhysicsEngine
                 isGrounded,
                 height));
         }
-        
-        return results;
     }
 
     private void ApplyResults(List<BodyState> results)

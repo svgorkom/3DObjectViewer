@@ -279,15 +279,17 @@ public class SelectionViewModel : ViewModelBase
             return;
 
         var position = new Point3D(SelectedObjectPositionX, SelectedObjectPositionY, SelectedObjectPositionZ);
-        var transformGroup = new Transform3DGroup();
 
-        transformGroup.Children.Add(new ScaleTransform3D(SelectedObjectScale, SelectedObjectScale, SelectedObjectScale));
-        transformGroup.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), SelectedObjectRotationX)));
-        transformGroup.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), SelectedObjectRotationY)));
-        transformGroup.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 0, 1), SelectedObjectRotationZ)));
-        transformGroup.Children.Add(new TranslateTransform3D(position.X, position.Y, position.Z));
+        // Build combined matrix directly for better performance
+        // Order: Scale -> RotateX -> RotateY -> RotateZ -> Translate
+        var matrix = Matrix3D.Identity;
+        matrix.Scale(new Vector3D(SelectedObjectScale, SelectedObjectScale, SelectedObjectScale));
+        matrix.Rotate(new Quaternion(new Vector3D(1, 0, 0), SelectedObjectRotationX));
+        matrix.Rotate(new Quaternion(new Vector3D(0, 1, 0), SelectedObjectRotationY));
+        matrix.Rotate(new Quaternion(new Vector3D(0, 0, 1), SelectedObjectRotationZ));
+        matrix.Translate(new Vector3D(position.X, position.Y, position.Z));
 
-        SelectedObject.Transform = transformGroup;
+        SelectedObject.Transform = new MatrixTransform3D(matrix);
         SelectionChanged?.Invoke();
     }
 
@@ -311,6 +313,12 @@ public class SelectionViewModel : ViewModelBase
 
         if (transform is TranslateTransform3D translate)
             return new Point3D(translate.OffsetX, translate.OffsetY, translate.OffsetZ);
+
+        if (transform is MatrixTransform3D matrixTransform)
+        {
+            var matrix = matrixTransform.Matrix;
+            return new Point3D(matrix.OffsetX, matrix.OffsetY, matrix.OffsetZ);
+        }
 
         if (transform is Transform3DGroup group)
         {
@@ -356,7 +364,16 @@ public class SelectionViewModel : ViewModelBase
 
     private void UpdateTransformPosition(Visual3D obj, Point3D position)
     {
-        if (obj.Transform is Transform3DGroup group)
+        if (obj.Transform is MatrixTransform3D existingMatrix)
+        {
+            // Update position in existing matrix by replacing the translation component
+            var matrix = existingMatrix.Matrix;
+            matrix.OffsetX = position.X;
+            matrix.OffsetY = position.Y;
+            matrix.OffsetZ = position.Z;
+            obj.Transform = new MatrixTransform3D(matrix);
+        }
+        else if (obj.Transform is Transform3DGroup group)
         {
             for (int i = 0; i < group.Children.Count; i++)
             {
@@ -370,13 +387,14 @@ public class SelectionViewModel : ViewModelBase
         }
         else
         {
-            var newGroup = new Transform3DGroup();
-            newGroup.Children.Add(new ScaleTransform3D(SelectedObjectScale, SelectedObjectScale, SelectedObjectScale));
-            newGroup.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), SelectedObjectRotationX)));
-            newGroup.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), SelectedObjectRotationY)));
-            newGroup.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 0, 1), SelectedObjectRotationZ)));
-            newGroup.Children.Add(new TranslateTransform3D(position.X, position.Y, position.Z));
-            obj.Transform = newGroup;
+            // Build combined matrix directly for better performance
+            var matrix = Matrix3D.Identity;
+            matrix.Scale(new Vector3D(SelectedObjectScale, SelectedObjectScale, SelectedObjectScale));
+            matrix.Rotate(new Quaternion(new Vector3D(1, 0, 0), SelectedObjectRotationX));
+            matrix.Rotate(new Quaternion(new Vector3D(0, 1, 0), SelectedObjectRotationY));
+            matrix.Rotate(new Quaternion(new Vector3D(0, 0, 1), SelectedObjectRotationZ));
+            matrix.Translate(new Vector3D(position.X, position.Y, position.Z));
+            obj.Transform = new MatrixTransform3D(matrix);
         }
     }
 

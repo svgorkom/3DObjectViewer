@@ -44,10 +44,11 @@ public sealed class BepuPhysicsEngine : IPhysicsEngine
     private readonly Dictionary<Guid, RigidBody> _rigidBodies = [];
     private readonly Dictionary<Guid, BodyHandle> _bodyHandles = [];
     private readonly Dictionary<BodyHandle, Guid> _handleToId = [];
+    private readonly Dictionary<Guid, TypedIndex> _shapeIndices = [];
     private readonly List<RigidBody> _updatedBodies = [];
 
     // Boundary configuration
-    private readonly List<StaticHandle> _boundaryStatics = [];
+    private readonly List<(StaticHandle Handle, TypedIndex ShapeIndex)> _boundaryStatics = [];
     private float _groundLevel;
     private float _bucketMinX, _bucketMaxX, _bucketMinY, _bucketMaxY, _bucketHeight;
     private bool _bucketEnabled;
@@ -194,6 +195,7 @@ public sealed class BepuPhysicsEngine : IPhysicsEngine
         _rigidBodies[body.Id] = body;
         _bodyHandles[body.Id] = handle;
         _handleToId[handle] = body.Id;
+        _shapeIndices[body.Id] = shapeIndex;
     }
 
     /// <inheritdoc/>
@@ -205,12 +207,20 @@ public sealed class BepuPhysicsEngine : IPhysicsEngine
         if (!_bodyHandles.TryGetValue(id, out var handle))
             return false;
 
+        // Get the shape index before removing the body
+        _shapeIndices.TryGetValue(id, out var shapeIndex);
+
         if (_simulation.Bodies.BodyExists(handle))
             _simulation.Bodies.Remove(handle);
+
+        // Remove the shape to free memory in the BufferPool
+        if (shapeIndex.Exists)
+            _simulation.Shapes.RemoveAndDispose(shapeIndex, _bufferPool);
 
         _bodyHandles.Remove(id);
         _handleToId.Remove(handle);
         _rigidBodies.Remove(id);
+        _shapeIndices.Remove(id);
 
         return true;
     }
@@ -221,15 +231,26 @@ public sealed class BepuPhysicsEngine : IPhysicsEngine
     /// <inheritdoc/>
     public void Clear()
     {
+        // Collect all shape indices before removing bodies
+        var shapesToRemove = new List<TypedIndex>(_shapeIndices.Values);
+
         foreach (var handle in _bodyHandles.Values)
         {
             if (_simulation.Bodies.BodyExists(handle))
                 _simulation.Bodies.Remove(handle);
         }
 
+        // Remove all shapes to free memory
+        foreach (var shapeIndex in shapesToRemove)
+        {
+            if (shapeIndex.Exists)
+                _simulation.Shapes.RemoveAndDispose(shapeIndex, _bufferPool);
+        }
+
         _bodyHandles.Clear();
         _handleToId.Clear();
         _rigidBodies.Clear();
+        _shapeIndices.Clear();
     }
 
     #endregion
@@ -297,11 +318,13 @@ public sealed class BepuPhysicsEngine : IPhysicsEngine
     {
         if (_simulation is null) return;
 
-        // Remove existing boundary statics
-        foreach (var handle in _boundaryStatics)
+        // Remove existing boundary statics and their shapes
+        foreach (var (handle, shapeIndex) in _boundaryStatics)
         {
             if (_simulation.Statics.StaticExists(handle))
                 _simulation.Statics.Remove(handle);
+            if (shapeIndex.Exists)
+                _simulation.Shapes.RemoveAndDispose(shapeIndex, _bufferPool);
         }
         _boundaryStatics.Clear();
 
@@ -356,7 +379,7 @@ public sealed class BepuPhysicsEngine : IPhysicsEngine
         var box = new Box(sizeX, sizeY, sizeZ);
         var shapeIndex = _simulation.Shapes.Add(box);
         var handle = _simulation.Statics.Add(new StaticDescription(position, shapeIndex));
-        _boundaryStatics.Add(handle);
+        _boundaryStatics.Add((handle, shapeIndex));
     }
 
     #endregion
@@ -380,6 +403,9 @@ public sealed class BepuPhysicsEngine : IPhysicsEngine
     private void OnTimerTick(object? sender, EventArgs e)
     {
         if (_disposed) return;
+        
+        // Skip simulation if no bodies exist - avoid idle allocations
+        if (_bodyHandles.Count == 0) return;
 
         var now = DateTime.Now;
         var deltaTime = (now - _lastUpdate).TotalSeconds * TimeScale;

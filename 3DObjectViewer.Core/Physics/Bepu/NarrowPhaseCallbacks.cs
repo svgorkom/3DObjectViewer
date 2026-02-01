@@ -14,7 +14,7 @@ namespace _3DObjectViewer.Core.Physics.Bepu;
 /// Configures material properties (friction, bounciness) for collisions
 /// and filters which collisions should be processed.
 /// </remarks>
-internal struct NarrowPhaseCallbacks : INarrowPhaseCallbacks
+public struct NarrowPhaseCallbacks : INarrowPhaseCallbacks
 {
     /// <summary>
     /// Friction coefficient for surface contacts.
@@ -37,15 +37,25 @@ internal struct NarrowPhaseCallbacks : INarrowPhaseCallbacks
     public float SpringDampingRatio { get; init; }
 
     /// <summary>
+    /// Cached spring settings to avoid creating new instances on every contact.
+    /// </summary>
+    private SpringSettings _cachedSpringSettings;
+
+    /// <summary>
     /// Creates callbacks with default hard surface properties.
     /// </summary>
-    public static NarrowPhaseCallbacks CreateDefault() => new()
+    public static NarrowPhaseCallbacks CreateDefault()
     {
-        FrictionCoefficient = 0.6f,
-        MaximumRecoveryVelocity = 2f,
-        SpringFrequency = 30f,
-        SpringDampingRatio = 1f
-    };
+        var callbacks = new NarrowPhaseCallbacks
+        {
+            FrictionCoefficient = 0.6f,
+            MaximumRecoveryVelocity = 2f,
+            SpringFrequency = 30f,
+            SpringDampingRatio = 1f
+        };
+        callbacks._cachedSpringSettings = new SpringSettings(callbacks.SpringFrequency, callbacks.SpringDampingRatio);
+        return callbacks;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool AllowContactGeneration(int workerIndex, CollidableReference a, CollidableReference b, ref float speculativeMargin)
@@ -70,7 +80,7 @@ internal struct NarrowPhaseCallbacks : INarrowPhaseCallbacks
     {
         pairMaterial.FrictionCoefficient = FrictionCoefficient;
         pairMaterial.MaximumRecoveryVelocity = MaximumRecoveryVelocity;
-        pairMaterial.SpringSettings = new SpringSettings(SpringFrequency, SpringDampingRatio);
+        pairMaterial.SpringSettings = _cachedSpringSettings;
         return true;
     }
 
